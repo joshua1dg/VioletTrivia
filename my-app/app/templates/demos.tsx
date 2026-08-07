@@ -12,6 +12,15 @@ import {
   whichPrinciplePrompt,
 } from "@/lib/templates/which-principle/fixture";
 import {
+  RankVariantsReveal,
+  RankVariantsReview,
+} from "@/lib/templates/rank-variants";
+import {
+  rankVariantsContent,
+  rankVariantsKey,
+  rankVariantsPrompt,
+} from "@/lib/templates/rank-variants/fixture";
+import {
   BestFeedbackReveal,
   BestFeedbackReview,
 } from "@/lib/templates/best-feedback";
@@ -79,6 +88,51 @@ function WhichPrincipleDemo() {
   );
 }
 
+function RankVariantsDemo() {
+  const [answer, setAnswer] = useState<Answer>({});
+  const [note, setNote] = useState("");
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <QuestionShell
+      label="Batch C · Item 1 of 4"
+      progress={1 / 4}
+      status={revealed ? "Answer" : "Anonymous · no score"}
+      statusTone={revealed ? "ok" : "muted"}
+      hint={revealed ? undefined : rankVariantsContent.footerHint}
+      action={
+        revealed
+          ? {
+              label: "Next item",
+              onClick: () => {
+                setRevealed(false);
+                setAnswer({});
+                setNote("");
+              },
+            }
+          : { label: "Submit ranking", onClick: () => setRevealed(true) }
+      }
+    >
+      {revealed ? (
+        <RankVariantsReveal
+          content={rankVariantsContent}
+          answerKey={rankVariantsKey}
+          answer={answer}
+        />
+      ) : (
+        <RankVariantsReview
+          content={rankVariantsContent}
+          prompt={rankVariantsPrompt}
+          answer={answer}
+          onAnswer={setAnswer}
+          note={note}
+          onNote={setNote}
+        />
+      )}
+    </QuestionShell>
+  );
+}
+
 function BestFeedbackDemo() {
   const [answer, setAnswer] = useState<Answer>({});
   const [revealed, setRevealed] = useState(false);
@@ -126,6 +180,7 @@ function BestFeedbackDemo() {
 
 const DEMOS = {
   which_principle: WhichPrincipleDemo,
+  rank_variants: RankVariantsDemo,
   best_feedback: BestFeedbackDemo,
 } as const;
 

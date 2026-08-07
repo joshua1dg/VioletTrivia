@@ -47,6 +47,27 @@ export type WhichPrincipleKey = {
 };
 
 /* ------------------------------------------------------------------ *
+ * T2 — rank_variants
+ * ------------------------------------------------------------------ */
+
+export type RankVariantsContent = {
+  turns: Turn[];
+  subhead?: string;
+  /** `note` describes what the variant does structurally, not what it says. */
+  options: { id: string; body: string; note: string }[];
+  /** Every reviewer sees the same variants in a different order. */
+  shuffle?: boolean;
+  footerHint?: string;
+};
+
+export type RankVariantsKey = {
+  /** Best first. grade is exact-match against this. */
+  keyOrder: string[];
+  rationaleTitle?: string;
+  rationale: string;
+};
+
+/* ------------------------------------------------------------------ *
  * T3 — best_feedback
  * ------------------------------------------------------------------ */
 

@@ -50,26 +50,20 @@ export default function TemplatesPage() {
       </Section>
 
       <Section
+        tag="T2"
+        title="Language breakdown — rank the completions"
+        blurb="Same change, four ways of saying it. Move each one until the best is on top."
+      >
+        <TemplateDemo kind="rank_variants" />
+      </Section>
+
+      <Section
         tag="T3"
         title="Practice writing feedback"
         blurb="A fellow's rationale and its rubric calls — pick the response that helps most."
       >
         <TemplateDemo kind="best_feedback" />
       </Section>
-
-      <section className="flex flex-col gap-2 rounded-[12px] border border-dashed border-line-4 bg-white/60 p-6">
-        <div className="flex flex-wrap items-baseline gap-3.5">
-          <span className="font-mono text-[12px] text-faint">T2</span>
-          <h2 className="text-[17px] font-semibold tracking-[-0.015em] text-muted">
-            Language breakdown — rank the completions
-          </h2>
-        </div>
-        <p className="max-w-[66ch] text-[13.5px] leading-[1.6] text-muted-3">
-          Not built yet. Ranking needs pointer-based drag so one code path
-          covers mouse, touch and keyboard — HTML5 drag events don&rsquo;t fire
-          on touch at all. That means adding dnd-kit before this one.
-        </p>
-      </section>
     </main>
   );
 }
