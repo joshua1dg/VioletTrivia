@@ -46,6 +46,7 @@ export const whichPrincipleContent: WhichPrincipleContent = {
   ],
   footerHint:
     "Both principles could be argued — pick the one the excerpt actually fails.",
+  notePrompt: "Why?",
 };
 
 export const whichPrincipleKey: WhichPrincipleKey = {

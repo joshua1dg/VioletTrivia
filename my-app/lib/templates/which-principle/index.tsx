@@ -1,8 +1,8 @@
 import { Excerpt } from "@/components/question/excerpt";
 import { OptionCard } from "@/components/question/shell";
-import { WhyNote } from "@/components/question/why-note";
 import type {
-  Answer,
+  RevealProps,
+  ReviewProps,
   WhichPrincipleContent,
   WhichPrincipleKey,
 } from "@/lib/templates/types";
@@ -24,16 +24,7 @@ export function WhichPrincipleReview({
   prompt,
   answer,
   onAnswer,
-  note,
-  onNote,
-}: {
-  content: WhichPrincipleContent;
-  prompt: string;
-  answer: Answer;
-  onAnswer: (next: Answer) => void;
-  note: string;
-  onNote: (next: string) => void;
-}) {
+}: ReviewProps<WhichPrincipleContent>) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2.5">
@@ -97,7 +88,6 @@ export function WhichPrincipleReview({
         })}
       </div>
 
-      <WhyNote value={note} onChange={onNote} />
     </div>
   );
 }
@@ -105,11 +95,7 @@ export function WhichPrincipleReview({
 export function WhichPrincipleReveal({
   content,
   answerKey,
-}: {
-  content: WhichPrincipleContent;
-  answerKey: WhichPrincipleKey;
-  answer: Answer;
-}) {
+}: RevealProps<WhichPrincipleContent, WhichPrincipleKey>) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">

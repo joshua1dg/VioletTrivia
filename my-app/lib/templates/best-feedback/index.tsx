@@ -1,9 +1,10 @@
 import { CodeChip, Excerpt } from "@/components/question/excerpt";
 import { OptionCard } from "@/components/question/shell";
 import type {
-  Answer,
   BestFeedbackContent,
   BestFeedbackKey,
+  RevealProps,
+  ReviewProps,
 } from "@/lib/templates/types";
 
 /* ------------------------------------------------------------------ *
@@ -23,12 +24,7 @@ export function BestFeedbackReview({
   prompt,
   answer,
   onAnswer,
-}: {
-  content: BestFeedbackContent;
-  prompt: string;
-  answer: Answer;
-  onAnswer: (next: Answer) => void;
-}) {
+}: ReviewProps<BestFeedbackContent>) {
   return (
     <div className="grid grid-cols-1 gap-6 @3xl:grid-cols-2 @3xl:gap-8">
       <div className="flex flex-col gap-4">
@@ -85,11 +81,7 @@ export function BestFeedbackReveal({
   content,
   answerKey,
   answer,
-}: {
-  content: BestFeedbackContent;
-  answerKey: BestFeedbackKey;
-  answer: Answer;
-}) {
+}: RevealProps<BestFeedbackContent, BestFeedbackKey>) {
   const picked = content.options.find((o) => o.id === answer.option);
   const strongest = content.options.find((o) => o.id === answerKey.key);
 

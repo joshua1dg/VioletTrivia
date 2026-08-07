@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { QuestionShell } from "@/components/question/shell";
+import { WhyNote } from "@/components/question/why-note";
 import {
   WhichPrincipleReveal,
   WhichPrincipleReview,
@@ -33,146 +34,175 @@ import type { Answer } from "@/lib/templates/types";
 
 /**
  * Each demo owns its own state, so the phone frame and the wide frame on the
- * same page can be driven independently — pick an option in one without the
- * other jumping. This is also roughly what the real flow will do: hold the
- * answer, submit, swap the body for the reveal.
+ * same page can be driven independently. This is roughly what the real flow
+ * will do: hold the answer, submit, swap the body for the reveal.
  */
 
-function WhichPrincipleDemo() {
+/**
+ * The "Why?" note belongs to the flow, not to any template — it maps to
+ * responses.rationale, which every template offers. Rendering it here keeps
+ * all three Review components on an identical prop signature, and whether it
+ * appears at all is authored content (`notePrompt`) rather than a hardcoded
+ * per-template decision.
+ */
+function ReviewBody({
+  notePrompt,
+  note,
+  onNote,
+  children,
+}: {
+  notePrompt?: string;
+  note: string;
+  onNote: (next: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      {children}
+      {notePrompt && (
+        <WhyNote value={note} onChange={onNote} label={notePrompt} />
+      )}
+    </div>
+  );
+}
+
+function useAnswerState() {
   const [answer, setAnswer] = useState<Answer>({});
   const [note, setNote] = useState("");
   const [revealed, setRevealed] = useState(false);
-
   const reset = () => {
     setRevealed(false);
     setAnswer({});
     setNote("");
   };
+  return { answer, setAnswer, note, setNote, revealed, setRevealed, reset };
+}
+
+function WhichPrincipleDemo() {
+  const s = useAnswerState();
 
   return (
     <QuestionShell
       label="Batch A · Item 2 of 3"
       progress={2 / 3}
-      status={revealed ? "Answer" : "Anonymous · no score"}
-      statusTone={revealed ? "ok" : "muted"}
+      status={s.revealed ? "Answer" : "Anonymous · no score"}
+      statusTone={s.revealed ? "ok" : "muted"}
       hint={
-        revealed ? whichPrincipleKey.summary : whichPrincipleContent.footerHint
+        s.revealed ? whichPrincipleKey.summary : whichPrincipleContent.footerHint
       }
       action={
-        revealed
-          ? { label: "Next item", onClick: reset }
+        s.revealed
+          ? { label: "Next item", onClick: s.reset }
           : {
               label: "Submit",
-              disabled: !answer.option,
-              onClick: () => setRevealed(true),
+              disabled: !s.answer.option,
+              onClick: () => s.setRevealed(true),
             }
       }
     >
-      {revealed ? (
+      {s.revealed ? (
         <WhichPrincipleReveal
           content={whichPrincipleContent}
           answerKey={whichPrincipleKey}
-          answer={answer}
+          answer={s.answer}
         />
       ) : (
-        <WhichPrincipleReview
-          content={whichPrincipleContent}
-          prompt={whichPrinciplePrompt}
-          answer={answer}
-          onAnswer={setAnswer}
-          note={note}
-          onNote={setNote}
-        />
+        <ReviewBody
+          notePrompt={whichPrincipleContent.notePrompt}
+          note={s.note}
+          onNote={s.setNote}
+        >
+          <WhichPrincipleReview
+            content={whichPrincipleContent}
+            prompt={whichPrinciplePrompt}
+            answer={s.answer}
+            onAnswer={s.setAnswer}
+          />
+        </ReviewBody>
       )}
     </QuestionShell>
   );
 }
 
 function RankVariantsDemo() {
-  const [answer, setAnswer] = useState<Answer>({});
-  const [note, setNote] = useState("");
-  const [revealed, setRevealed] = useState(false);
+  const s = useAnswerState();
 
   return (
     <QuestionShell
       label="Batch C · Item 1 of 4"
       progress={1 / 4}
-      status={revealed ? "Answer" : "Anonymous · no score"}
-      statusTone={revealed ? "ok" : "muted"}
-      hint={revealed ? undefined : rankVariantsContent.footerHint}
+      status={s.revealed ? "Answer" : "Anonymous · no score"}
+      statusTone={s.revealed ? "ok" : "muted"}
+      hint={s.revealed ? undefined : rankVariantsContent.footerHint}
       action={
-        revealed
-          ? {
-              label: "Next item",
-              onClick: () => {
-                setRevealed(false);
-                setAnswer({});
-                setNote("");
-              },
-            }
-          : { label: "Submit ranking", onClick: () => setRevealed(true) }
+        s.revealed
+          ? { label: "Next item", onClick: s.reset }
+          : { label: "Submit ranking", onClick: () => s.setRevealed(true) }
       }
     >
-      {revealed ? (
+      {s.revealed ? (
         <RankVariantsReveal
           content={rankVariantsContent}
           answerKey={rankVariantsKey}
-          answer={answer}
+          answer={s.answer}
         />
       ) : (
-        <RankVariantsReview
-          content={rankVariantsContent}
-          prompt={rankVariantsPrompt}
-          answer={answer}
-          onAnswer={setAnswer}
-          note={note}
-          onNote={setNote}
-        />
+        <ReviewBody
+          notePrompt={rankVariantsContent.notePrompt}
+          note={s.note}
+          onNote={s.setNote}
+        >
+          <RankVariantsReview
+            content={rankVariantsContent}
+            prompt={rankVariantsPrompt}
+            answer={s.answer}
+            onAnswer={s.setAnswer}
+          />
+        </ReviewBody>
       )}
     </QuestionShell>
   );
 }
 
 function BestFeedbackDemo() {
-  const [answer, setAnswer] = useState<Answer>({});
-  const [revealed, setRevealed] = useState(false);
+  const s = useAnswerState();
 
   return (
     <QuestionShell
       label="Reviewer training · Item 5 of 8"
       progress={5 / 8}
-      status={revealed ? "Answer" : "Choosing"}
-      statusTone={revealed ? "ok" : "muted"}
-      hint={revealed ? undefined : bestFeedbackContent.footerHint}
+      status={s.revealed ? "Answer" : "Choosing"}
+      statusTone={s.revealed ? "ok" : "muted"}
+      hint={s.revealed ? undefined : bestFeedbackContent.footerHint}
       action={
-        revealed
-          ? {
-              label: "Next item",
-              onClick: () => {
-                setRevealed(false);
-                setAnswer({});
-              },
-            }
+        s.revealed
+          ? { label: "Next item", onClick: s.reset }
           : {
               label: "Check",
-              disabled: !answer.option,
-              onClick: () => setRevealed(true),
+              disabled: !s.answer.option,
+              onClick: () => s.setRevealed(true),
             }
       }
     >
-      {revealed ? (
+      {s.revealed ? (
         <BestFeedbackReveal
           content={bestFeedbackContent}
           answerKey={bestFeedbackKey}
-          answer={answer}
+          answer={s.answer}
         />
       ) : (
-        <BestFeedbackReview
-          content={bestFeedbackContent}
-          prompt={bestFeedbackPrompt}
-          answer={answer}
-          onAnswer={setAnswer}
-        />
+        <ReviewBody
+          notePrompt={bestFeedbackContent.notePrompt}
+          note={s.note}
+          onNote={s.setNote}
+        >
+          <BestFeedbackReview
+            content={bestFeedbackContent}
+            prompt={bestFeedbackPrompt}
+            answer={s.answer}
+            onAnswer={s.setAnswer}
+          />
+        </ReviewBody>
       )}
     </QuestionShell>
   );

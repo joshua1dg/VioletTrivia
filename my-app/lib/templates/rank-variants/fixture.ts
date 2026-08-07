@@ -37,6 +37,7 @@ export const rankVariantsContent: RankVariantsContent = {
     },
   ],
   footerHint: "Every reviewer sees the same four, shuffled.",
+  notePrompt: "What separates your top pick from your second?",
 };
 
 export const rankVariantsKey: RankVariantsKey = {

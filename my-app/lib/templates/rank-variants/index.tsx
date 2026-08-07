@@ -1,9 +1,9 @@
 import { Excerpt } from "@/components/question/excerpt";
-import { WhyNote } from "@/components/question/why-note";
 import type {
-  Answer,
   RankVariantsContent,
   RankVariantsKey,
+  RevealProps,
+  ReviewProps,
 } from "@/lib/templates/types";
 
 /* ------------------------------------------------------------------ *
@@ -108,16 +108,7 @@ export function RankVariantsReview({
   prompt,
   answer,
   onAnswer,
-  note,
-  onNote,
-}: {
-  content: RankVariantsContent;
-  prompt: string;
-  answer: Answer;
-  onAnswer: (next: Answer) => void;
-  note: string;
-  onNote: (next: string) => void;
-}) {
+}: ReviewProps<RankVariantsContent>) {
   const order = answer.order ?? content.options.map((o) => o.id);
 
   const move = (from: number, to: number) => {
@@ -191,11 +182,6 @@ export function RankVariantsReview({
         })}
       </ul>
 
-      <WhyNote
-        value={note}
-        onChange={onNote}
-        label="What separates your top pick from your second?"
-      />
     </div>
   );
 }
@@ -204,11 +190,7 @@ export function RankVariantsReveal({
   content,
   answerKey,
   answer,
-}: {
-  content: RankVariantsContent;
-  answerKey: RankVariantsKey;
-  answer: Answer;
-}) {
+}: RevealProps<RankVariantsContent, RankVariantsKey>) {
   const yours = answer.order ?? content.options.map((o) => o.id);
 
   return (

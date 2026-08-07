@@ -22,6 +22,21 @@ export type Turn = {
   meta?: string; // "1 sentence · turn 3"
 };
 
+/**
+ * Carried by every template's content, so it lives here rather than being
+ * repeated three times.
+ */
+export type CommonContent = {
+  /** Footer line under the action button. */
+  footerHint?: string;
+  /**
+   * Label for the optional "Why?" note. Omit and the field doesn't render.
+   * It maps to responses.rationale, which every template offers, so the flow
+   * renders it — not the template body.
+   */
+  notePrompt?: string;
+};
+
 /* ------------------------------------------------------------------ *
  * T1 — which_principle
  * ------------------------------------------------------------------ */
@@ -31,11 +46,10 @@ export type Turn = {
  * come from the principles table via a join on `code` — the author only ever
  * references codes. They are inlined here so fixtures can render standalone.
  */
-export type WhichPrincipleContent = {
+export type WhichPrincipleContent = CommonContent & {
   turns: Turn[];
   inPlay: { code: string; name: string; descriptor: string }[];
   options: { id: string; principleCode: string; subtext: string }[];
-  footerHint?: string;
 };
 
 export type WhichPrincipleKey = {
@@ -50,14 +64,13 @@ export type WhichPrincipleKey = {
  * T2 — rank_variants
  * ------------------------------------------------------------------ */
 
-export type RankVariantsContent = {
+export type RankVariantsContent = CommonContent & {
   turns: Turn[];
   subhead?: string;
   /** `note` describes what the variant does structurally, not what it says. */
   options: { id: string; body: string; note: string }[];
   /** Every reviewer sees the same variants in a different order. */
   shuffle?: boolean;
-  footerHint?: string;
 };
 
 export type RankVariantsKey = {
@@ -74,11 +87,10 @@ export type RankVariantsKey = {
 /** A rubric call the fellow made, and whether it holds up. */
 export type RubricCall = { code: string; verdict: "ok" | "wrong" };
 
-export type BestFeedbackContent = {
+export type BestFeedbackContent = CommonContent & {
   turns: Turn[];
   subject: { rationale: string; calls: RubricCall[] };
   options: { id: string; body: string }[];
-  footerHint?: string;
 };
 
 export type BestFeedbackKey = {
@@ -96,3 +108,25 @@ export type Answer = { option?: string; order?: string[] };
 
 export type TallyRow = { label: string; votes: number; tone?: "ok" | "bad" | "muted" };
 export type TallyGroup = { title?: string; rows: TallyRow[] };
+
+/* ------------------------------------------------------------------ *
+ * The component contract
+ *
+ * Every template's Review and Reveal take exactly these props — only the
+ * content and answer-key types vary. Annotating each component with these
+ * makes the uniformity a compile error to break, rather than a convention
+ * someone has to remember, and it is what the registry will hold.
+ * ------------------------------------------------------------------ */
+
+export type ReviewProps<C> = {
+  content: C;
+  prompt: string;
+  answer: Answer;
+  onAnswer: (next: Answer) => void;
+};
+
+export type RevealProps<C, K> = {
+  content: C;
+  answerKey: K;
+  answer: Answer;
+};
