@@ -38,7 +38,7 @@ export function QuestionShell({
     // viewport's. That is what lets a 390px frame and a 1040px frame sit side
     // by side on one screen and each render its own real layout.
     <section className="@container flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-line bg-white">
-      <header className="flex items-center justify-between gap-3 border-b border-line-2 px-[18px] py-4 @3xl:px-6">
+      <header className="flex items-center justify-between gap-3 border-b border-line-2 px-4.5 py-4 @3xl:px-6">
         <span className="text-[13px] font-medium text-ink-4">{label}</span>
         {status && (
           <span
@@ -60,13 +60,13 @@ export function QuestionShell({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-[18px] @3xl:p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4.5 @3xl:p-6">
         {children}
       </div>
 
-      <footer className="flex flex-col gap-3 border-t border-line-2 p-[18px] @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:px-6 @3xl:py-4">
+      <footer className="flex flex-col gap-3 border-t border-line-2 p-4.5 @3xl:flex-row @3xl:items-center @3xl:justify-between @3xl:px-6 @3xl:py-4">
         {hint && (
-          <p className="text-[12.5px] leading-[1.5] text-muted-3">{hint}</p>
+          <p className="text-[12.5px] leading-normal text-muted-3">{hint}</p>
         )}
         <button
           type="button"

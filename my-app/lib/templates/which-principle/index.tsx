@@ -53,7 +53,7 @@ export function WhichPrincipleReview({
                 <span className="text-[14px] font-semibold tracking-[-0.01em] text-ink @3xl:text-[15px]">
                   {p.name}
                 </span>
-                <span className="text-[12.5px] leading-[1.5] text-muted @3xl:text-[13px]">
+                <span className="text-[12.5px] leading-normal text-muted @3xl:text-[13px]">
                   {p.descriptor}
                 </span>
               </div>
@@ -88,7 +88,7 @@ export function WhichPrincipleReview({
                 >
                   {opt.principleCode} — {principle?.name}
                 </span>
-                <span className="text-[12px] leading-[1.5] text-muted @3xl:text-[13px]">
+                <span className="text-[12px] leading-normal text-muted @3xl:text-[13px]">
                   {opt.subtext}
                 </span>
               </span>

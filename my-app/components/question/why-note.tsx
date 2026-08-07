@@ -31,7 +31,7 @@ export function WhyNote({
         onChange={(e) => onChange(e.target.value)}
         rows={2}
         placeholder="What made you pick that one?"
-        className="resize-none bg-transparent text-[13.5px] leading-[1.6] text-ink-4 outline-none placeholder:text-faint"
+        className="resize-none bg-transparent text-[13.5px] leading-[1.6] text-ink-4 outline-none"
       />
     </div>
   );

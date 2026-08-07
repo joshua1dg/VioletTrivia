@@ -40,12 +40,37 @@
   --color-line-3: #f1f2f5;
   --color-line-4: #d9dbe2;
 
-  --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+/* next/font injects --font-inter and --font-plex-mono onto <html> at runtime,
+   so nothing in CSS declares them and static analysis flags them.
+   Declaring them here fixes that AND gives a real fallback, without the usual
+   risk: these sit in @layer base, and unlayered CSS beats layered CSS no
+   matter its specificity. next/font's class is unlayered, so it always wins.
+   These values only apply if the fonts never load at all. */
+@layer base {
+  :root {
+    --font-inter: "Inter", system-ui, sans-serif;
+    --font-plex-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+}
+
+/* `inline` substitutes the value straight into the utility instead of adding
+   another layer of indirection through a Tailwind-emitted variable. This is
+   the form Next's own docs use. */
+@theme inline {
+  --font-sans: var(--font-inter, ui-sans-serif), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono, ui-monospace), monospace;
 }
 
 body {
   background: var(--color-canvas);
   color: var(--color-ink-2);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Set once here rather than per-field with placeholder:* utilities, which
+   Tailwind's conflict check misreads as clashing with the input's own color. */
+::placeholder {
+  color: var(--color-faint);
 }
