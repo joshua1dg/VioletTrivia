@@ -74,7 +74,7 @@ export function QuestionLibrary({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search excerpts"
-              className="w-[200px] rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none focus:border-violet-line"
+              className="w-50 rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none"
             />
             <span className="text-[12.5px] whitespace-nowrap text-muted-3">
               Sorted by updated

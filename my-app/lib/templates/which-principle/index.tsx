@@ -100,8 +100,8 @@ export function WhichPrincipleReveal({
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
         {content.options.map((opt) => {
-          const isKey = opt.principleCode === answerKey.key;
-          const paragraphs = answerKey.perOption[opt.principleCode] ?? [];
+          const isKey = opt.id === answerKey.key;
+          const paragraphs = answerKey.perOption[opt.id] ?? [];
           return (
             <div
               key={opt.id}

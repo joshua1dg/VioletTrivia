@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type { QuestionStatus } from "@/lib/admin/fixtures";
 
@@ -39,6 +40,24 @@ export function PrimaryButton({
     >
       {children}
     </button>
+  );
+}
+
+/** Same look as PrimaryButton, but navigates. */
+export function PrimaryLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[7px] bg-violet px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-ink"
+    >
+      {children}
+    </Link>
   );
 }
 

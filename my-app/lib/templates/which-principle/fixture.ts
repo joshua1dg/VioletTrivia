@@ -31,15 +31,17 @@ export const whichPrincipleContent: WhichPrincipleContent = {
       body: "I'll move the actual translation strings out of App.vue and into JSON files under src/assets, then connect them through Vue I18n so future components can use the same locale state, keeping App.vue responsible only for selecting the current locale.",
     },
   ],
+  // Option id IS the principle code here, so responses.answer and
+  // answer_key.key compare directly without a lookup.
   options: [
     {
-      id: "s1",
+      id: "S1",
       principleCode: "S1",
       subtext:
         "The content is all there; it's the shape of the sentence that costs the reader.",
     },
     {
-      id: "c1",
+      id: "C1",
       principleCode: "C1",
       subtext: "The reader is left unsure what was agreed, changed, or left behind.",
     },

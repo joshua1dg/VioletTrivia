@@ -130,3 +130,24 @@ export type RevealProps<C, K> = {
   answerKey: K;
   answer: Answer;
 };
+
+/** Reference data an authoring form needs but doesn't own. */
+export type PrincipleOption = {
+  code: string;
+  name: string;
+  descriptor?: string;
+};
+
+/**
+ * The admin form. Same shape for every template — it edits `content` and
+ * `answerKey` and hands both back. The answer key is edited alongside the
+ * question rather than in a separate step, because for these templates the
+ * key IS a property of an option ("this is the right one, and here's why").
+ */
+export type AuthorProps<C, K> = {
+  content: C;
+  answerKey: K;
+  onContent: (next: C) => void;
+  onAnswerKey: (next: K) => void;
+  principles: PrincipleOption[];
+};
