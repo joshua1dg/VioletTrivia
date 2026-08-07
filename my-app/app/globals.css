@@ -1,26 +1,51 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Project Violet palette, lifted from the design docs.
+   Light only — the design has no dark rendition. */
+@theme {
+  --color-canvas: #f5f5f7;
+  --color-surface: #fafafb;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-violet: #6d4aff;
+  --color-violet-ink: #5b37f0;
+  --color-violet-deep: #3f1fd6;
+  --color-violet-tint: #f7f5ff;
+  --color-violet-tint-2: #f4f2ff;
+  --color-violet-line: #dfdaff;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ok: #059669;
+  --color-ok-ink: #047857;
+  --color-ok-tint: #f1faf6;
+  --color-ok-line: #bfe7d8;
+
+  --color-bad: #e11d48;
+  --color-bad-ink: #be123c;
+  --color-bad-tint: #fff1f4;
+  --color-bad-line: #f6cdd6;
+
+  --color-ink: #15171c;
+  --color-ink-2: #1b1d23;
+  --color-ink-3: #272a31;
+  --color-ink-4: #3d414a;
+
+  --color-muted: #5c6270;
+  --color-muted-2: #767c89;
+  --color-muted-3: #8a8f9b;
+  --color-faint: #a0a5af;
+  --color-faint-2: #c0c4cc;
+  --color-dot: #c6cad3;
+
+  --color-line: #e3e4e9;
+  --color-line-2: #ebecf0;
+  --color-line-3: #f1f2f5;
+  --color-line-4: #d9dbe2;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink-2);
+  -webkit-font-smoothing: antialiased;
 }
