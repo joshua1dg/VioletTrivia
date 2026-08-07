@@ -500,4 +500,23 @@ create policy anon_read_live_sessions
   on live_sessions for select to anon
   using (true);
 
-alter publication supabase_realtime add table live_sessions;
+-- Supabase's bootstrap creates this publication, so it already exists on a
+-- real project and on `supabase start` — which is why our migration never
+-- declares it, and why a SQL IDE cannot resolve the name. The guard covers a
+-- bare Postgres that has no Supabase bootstrap (a test container, a partial
+-- restore), and makes the whole block idempotent.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication where pubname = 'supabase_realtime'
+  ) then
+    create publication supabase_realtime for table live_sessions;
+  elsif not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'live_sessions'
+  ) then
+    alter publication supabase_realtime add table live_sessions;
+  end if;
+end $$;
