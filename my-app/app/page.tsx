@@ -11,12 +11,20 @@ export default function Home() {
         Nothing wired to the database yet. The question templates are built and
         interactive.
       </p>
-      <Link
-        href="/templates"
-        className="rounded-[9px] bg-violet px-5 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-violet-ink"
-      >
-        Question templates
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/templates"
+          className="rounded-[9px] bg-violet px-5 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-violet-ink"
+        >
+          Question templates
+        </Link>
+        <Link
+          href="/admin"
+          className="rounded-[9px] border border-line px-5 py-2.5 text-[14px] font-medium text-ink-4 transition-colors hover:bg-surface"
+        >
+          Admin
+        </Link>
+      </div>
     </main>
   );
 }
