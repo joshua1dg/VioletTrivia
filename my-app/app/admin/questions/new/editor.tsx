@@ -96,8 +96,8 @@ function TemplateForm({
       return <TemplateSection def={registry.which_principle} {...shared} />;
     case "rank_variants":
       return <TemplateSection def={registry.rank_variants} {...shared} />;
-    case "best_feedback":
-      return <TemplateSection def={registry.best_feedback} {...shared} />;
+    case "write_feedback":
+      return <TemplateSection def={registry.write_feedback} {...shared} />;
   }
 }
 

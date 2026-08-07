@@ -2,8 +2,8 @@ import type { ComponentType } from "react";
 import type {
   Answer,
   AuthorProps,
-  BestFeedbackContent,
-  BestFeedbackKey,
+  WriteFeedbackContent,
+  WriteFeedbackKey,
   RankVariantsContent,
   RankVariantsKey,
   RevealProps,
@@ -20,8 +20,8 @@ import {
 } from "./which-principle/author";
 import { RankVariantsReveal, RankVariantsReview } from "./rank-variants";
 import { RankVariantsAuthor, emptyRankVariants } from "./rank-variants/author";
-import { BestFeedbackReveal, BestFeedbackReview } from "./best-feedback";
-import { BestFeedbackAuthor, emptyBestFeedback } from "./best-feedback/author";
+import { WriteFeedbackReveal, WriteFeedbackReview } from "./write-feedback";
+import { WriteFeedbackAuthor, emptyWriteFeedback } from "./write-feedback/author";
 
 /**
  * Everything that varies by template, in one object per template.
@@ -54,15 +54,20 @@ export type QuestionTemplate<C, K> = {
    */
   principleCodes: (content: C) => string[];
 
-  /** 0 or 1. Computed at read time, never stored. */
-  grade: (answer: Answer, answerKey: K) => 0 | 1;
+  /**
+   * 0 or 1, computed at read time and never stored — or `null` where the
+   * template has no gradeable answer. write_feedback takes prose, so there is
+   * nothing to compare a key against; anything that scores must skip it
+   * rather than quietly count every response as wrong.
+   */
+  grade: ((answer: Answer, answerKey: K) => 0 | 1) | null;
 };
 
 /** Which content and answer-key types belong to which template. */
 type Shapes = {
   which_principle: [WhichPrincipleContent, WhichPrincipleKey];
   rank_variants: [RankVariantsContent, RankVariantsKey];
-  best_feedback: [BestFeedbackContent, BestFeedbackKey];
+  write_feedback: [WriteFeedbackContent, WriteFeedbackKey];
 };
 
 export type Registry = {
@@ -107,18 +112,21 @@ export const registry: Registry = {
         : 0,
   },
 
-  best_feedback: {
-    key: "best_feedback",
-    label: "Practice writing feedback",
+  write_feedback: {
+    key: "write_feedback",
+    label: "Reviewer feedback",
     blurb:
-      "A fellow's rationale and its rubric calls — pick the response that helps most.",
-    Review: BestFeedbackReview,
-    Reveal: BestFeedbackReveal,
-    Author: BestFeedbackAuthor,
-    empty: emptyBestFeedback,
-    // The calls the fellow made are the codes in play, right or wrong.
-    principleCodes: (content) => content.subject.calls.map((c) => c.code),
-    grade: (answer, answerKey) => pickOne(answer, answerKey.key),
+      "A fellow's rationale — decide whether it holds and write your own feedback.",
+    Review: WriteFeedbackReview,
+    Reveal: WriteFeedbackReveal,
+    Author: WriteFeedbackAuthor,
+    empty: emptyWriteFeedback,
+    // The rationale names codes in prose, not as structured data. If these
+    // questions should link to principles, that needs an explicit field —
+    // there's nothing to derive from.
+    principleCodes: () => [],
+    // Prose answer: nothing to grade against.
+    grade: null,
   },
 };
 

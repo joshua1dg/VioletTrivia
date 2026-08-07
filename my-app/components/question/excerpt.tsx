@@ -82,27 +82,3 @@ export function Excerpt({
     </div>
   );
 }
-
-/** A rubric code the fellow invoked, colored by whether the call holds up. */
-export function CodeChip({
-  code,
-  verdict,
-}: {
-  code: string;
-  verdict?: "ok" | "wrong";
-}) {
-  const tone =
-    verdict === "wrong"
-      ? "border-bad-line bg-bad-tint text-bad-ink"
-      : verdict === "ok"
-        ? "border-ok-line bg-ok-tint text-ok-ink"
-        : "border-line bg-white text-muted";
-
-  return (
-    <span
-      className={`rounded-[5px] border px-2 py-0.5 font-mono text-[11px] ${tone}`}
-    >
-      {code}
-    </span>
-  );
-}

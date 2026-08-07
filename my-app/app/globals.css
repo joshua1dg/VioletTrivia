@@ -18,6 +18,11 @@
   --color-ok-tint: #f1faf6;
   --color-ok-line: #bfe7d8;
 
+  --color-warn: #c9821a;
+  --color-warn-ink: #9a5b0b;
+  --color-warn-tint: #fdf6ec;
+  --color-warn-line: #f2dcb8;
+
   --color-bad: #e11d48;
   --color-bad-ink: #be123c;
   --color-bad-tint: #fff1f4;

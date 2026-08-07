@@ -36,8 +36,9 @@ create extension if not exists "pgcrypto";
 --   which_principle  T1 · two rubric codes in play; pick which one the
 --                         excerpt should be judged under
 --   rank_variants    T2 · four completions of the same answer; drag to rank
---   best_feedback    T3 · a fellow's rationale and its rubric calls; pick
---                         which of four responses helps them most
+--   write_feedback   T3 · a fellow's rationale; decide whether it holds and
+--                         write your own feedback. Prose answer — no key to
+--                         grade against, nothing to tally.
 --
 -- Adding a fourth is `alter type template_type add value '…'`, which does
 -- not rewrite the table. Removing one is not symmetrical — dropping a value
@@ -51,7 +52,7 @@ create extension if not exists "pgcrypto";
 create type template_type as enum (
   'which_principle',
   'rank_variants',
-  'best_feedback'
+  'write_feedback'
 );
 
 create type question_status as enum ('draft', 'live', 'archived');
@@ -163,26 +164,36 @@ create table topics (
 --     { turns: [{ role:'user', body }], shuffle: true,
 --       options: [{ id:'a', body, note }] }        -- note: what the variant does structurally
 --
---   best_feedback
---     { turns: [{ role, body }],                   -- body may be markdown; T3 assistant turns have bullets
---       subject: { rationale, calls: [{ code:'S1', verdict:'wrong' }] },
---       options: [{ id:'a', body }] }              -- four candidate responses
+--   write_feedback
+--     { turns: [{ role, body }],                   -- [0] the request, [1] the completion
+--       subject: { rationale } }                   -- what the fellow wrote about it
+--     No options: the reviewer writes prose, stored as answer.feedback.
 --
 -- ANSWER KEY SHAPES — every question has one:
 --
---   which_principle / best_feedback  (pick one)
+--   which_principle  (pick one)
 --     { key: 'S1', rationale: '…',
 --       per_option: { S1: '…', C1: 'not the issue here: …' },
---       bullets?: [{ label, detail }],             -- T3 'what makes it strong'
 --       summary?: '…', discussion_note?: '…' }
 --
 --   rank_variants
 --     { key_order: ['b','c','a','d'], rationale: 'why the top one wins…',
 --       per_option: { b: '…' } }
 --
+--   write_feedback
+--     { verdict: 'Rationale is weak', verdict_tone: 'weak'|'strong',
+--       blocks: { working, correcting, improve },
+--       exemplar: '…', tone_note: '…' }
+--
 -- grade(answer, answer_key) returns 0 or 1 — exact match, including for
--- rank_variants. tally(answers, content) returns groups of bars: one group
--- for the pick-one templates, one group per position for rank_variants.
+-- rank_variants. write_feedback is the exception: its answer is prose, so it
+-- has NO grade at all. Anything that scores must skip it rather than count
+-- every response as wrong.
+--
+-- tally(answers, content) returns groups of bars: one group for the pick-one
+-- template, one group per position for rank_variants, and nothing for
+-- write_feedback — there is no distribution, only what people wrote.
+--
 -- Both live in the registry, both computed at read time, neither stored.
 --
 -- option ids must be stable and never reused. responses.answer stores the
@@ -428,7 +439,7 @@ create table session_participants (
 -- ANSWER SHAPES:
 --   single-select   { option: 'misaligned' }
 --   rank_variants   { order: ['b','c','a','d'] }
---   write_feedback  { option: 'weak', feedback: '…' }
+--   write_feedback  { feedback: '…' }   -- prose, nothing to compare
 --
 -- rationale is the optional "Why?" note offered on every template, kept
 -- out of answer because it is universal and gets read in bulk at reveal.

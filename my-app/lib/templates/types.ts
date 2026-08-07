@@ -7,7 +7,7 @@
  * rather than two. Nothing here is validated at runtime yet.
  */
 
-export type TemplateKey = "which_principle" | "rank_variants" | "best_feedback";
+export type TemplateKey = "which_principle" | "rank_variants" | "write_feedback";
 
 /**
  * One turn of the excerpt being judged.
@@ -81,30 +81,41 @@ export type RankVariantsKey = {
 };
 
 /* ------------------------------------------------------------------ *
- * T3 — best_feedback
+ * T3 — write_feedback
+ *
+ * The reviewer reads a fellow's rationale, decides for themselves whether it
+ * holds, and WRITES their own feedback. There are no options — the answer is
+ * prose. The reveal is a fixed three-move breakdown plus a worked example.
  * ------------------------------------------------------------------ */
 
-/** A rubric call the fellow made, and whether it holds up. */
-export type RubricCall = { code: string; verdict: "ok" | "wrong" };
-
-export type BestFeedbackContent = CommonContent & {
+export type WriteFeedbackContent = CommonContent & {
+  /** [0] is the user's request, [1] is the completion being reviewed. */
   turns: Turn[];
-  subject: { rationale: string; calls: RubricCall[] };
-  options: { id: string; body: string }[];
+  subject: { rationale: string };
 };
 
-export type BestFeedbackKey = {
-  key: string;
-  /** "What makes it strong" — label plus the reason. */
-  bullets: { label: string; detail: string }[];
+export type WriteFeedbackKey = {
+  /** The pill at the top of the reveal, e.g. "Rationale is weak". */
+  verdict: string;
+  verdictTone: "weak" | "strong";
+  /** The three moves, in order. */
+  blocks: { working: string; correcting: string; improve: string };
+  /** "Feedback that lands" — a worked example of the whole thing. */
+  exemplar: string;
+  toneNote?: string;
 };
 
 /* ------------------------------------------------------------------ *
  * Answers
  * ------------------------------------------------------------------ */
 
-/** What a participant submits. `order` belongs to rank_variants, built later. */
-export type Answer = { option?: string; order?: string[] };
+/**
+ * What a participant submits.
+ *   option   pick-one templates
+ *   order    rank_variants
+ *   feedback write_feedback — prose, so nothing to compare a key against
+ */
+export type Answer = { option?: string; order?: string[]; feedback?: string };
 
 export type TallyRow = { label: string; votes: number; tone?: "ok" | "bad" | "muted" };
 export type TallyGroup = { title?: string; rows: TallyRow[] };

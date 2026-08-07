@@ -59,10 +59,10 @@ export default function TemplatesPage() {
 
       <Section
         tag="T3"
-        title="Practice writing feedback"
-        blurb="A fellow's rationale and its rubric calls — pick the response that helps most."
+        title="Reviewer feedback"
+        blurb="The fellow reads a rationale, decides whether it holds, and writes their own feedback. The reveal breaks the answer into three moves."
       >
-        <TemplateDemo kind="best_feedback" />
+        <TemplateDemo kind="write_feedback" />
       </Section>
     </main>
   );

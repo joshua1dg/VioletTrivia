@@ -8,7 +8,7 @@ import type { TemplateKey } from "@/lib/templates/types";
 export const TEMPLATE_LABEL: Record<TemplateKey, string> = {
   which_principle: "Principles",
   rank_variants: "Rank replies",
-  best_feedback: "Best feedback",
+  write_feedback: "Reviewer feedback",
 };
 
 export type QuestionStatus = "draft" | "live" | "archived";
@@ -110,7 +110,7 @@ export const questions: QuestionRow[] = [
   {
     id: "q2",
     excerpt: "why is the build failing on my branch?",
-    template: "best_feedback",
+    template: "write_feedback",
     topics: ["edge-case"],
     principles: ["I3", "S3", "S1"],
     responses: 17,
@@ -140,7 +140,7 @@ export const questions: QuestionRow[] = [
   {
     id: "q5",
     excerpt: "the changelog badges look cramped, can you fix the spacing",
-    template: "best_feedback",
+    template: "write_feedback",
     topics: ["edge-case"],
     principles: ["S1", "S2"],
     responses: 0,

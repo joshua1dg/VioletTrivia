@@ -22,14 +22,14 @@ import {
   rankVariantsPrompt,
 } from "@/lib/templates/rank-variants/fixture";
 import {
-  BestFeedbackReveal,
-  BestFeedbackReview,
-} from "@/lib/templates/best-feedback";
+  WriteFeedbackReveal,
+  WriteFeedbackReview,
+} from "@/lib/templates/write-feedback";
 import {
-  bestFeedbackContent,
-  bestFeedbackKey,
-  bestFeedbackPrompt,
-} from "@/lib/templates/best-feedback/fixture";
+  writeFeedbackContent,
+  writeFeedbackKey,
+  writeFeedbackPrompt,
+} from "@/lib/templates/write-feedback/fixture";
 import type { Answer } from "@/lib/templates/types";
 
 /**
@@ -164,41 +164,42 @@ function RankVariantsDemo() {
   );
 }
 
-function BestFeedbackDemo() {
+function WriteFeedbackDemo() {
   const s = useAnswerState();
 
   return (
     <QuestionShell
-      label="Reviewer training · Item 5 of 8"
-      progress={5 / 8}
-      status={s.revealed ? "Answer" : "Choosing"}
+      label="Reviewer training · Item 4 of 12"
+      progress={4 / 12}
+      status={s.revealed ? "Reveal" : undefined}
       statusTone={s.revealed ? "ok" : "muted"}
-      hint={s.revealed ? undefined : bestFeedbackContent.footerHint}
+      hint={s.revealed ? undefined : writeFeedbackContent.footerHint}
       action={
         s.revealed
           ? { label: "Next item", onClick: s.reset }
           : {
-              label: "Check",
-              disabled: !s.answer.option,
+              label: "Submit & reveal",
+              // The answer is prose, so "answered" means they wrote something.
+              disabled: !s.answer.feedback?.trim(),
               onClick: () => s.setRevealed(true),
             }
       }
     >
       {s.revealed ? (
-        <BestFeedbackReveal
-          content={bestFeedbackContent}
-          answerKey={bestFeedbackKey}
+        <WriteFeedbackReveal
+          content={writeFeedbackContent}
+          answerKey={writeFeedbackKey}
           answer={s.answer}
         />
       ) : (
         <ReviewBody
-          notePrompt={bestFeedbackContent.notePrompt}
+          notePrompt={writeFeedbackContent.notePrompt}
           note={s.note}
           onNote={s.setNote}
         >
-          <BestFeedbackReview
-            content={bestFeedbackContent}
-            prompt={bestFeedbackPrompt}
+          <WriteFeedbackReview
+            content={writeFeedbackContent}
+            prompt={writeFeedbackPrompt}
             answer={s.answer}
             onAnswer={s.setAnswer}
           />
@@ -211,7 +212,7 @@ function BestFeedbackDemo() {
 const DEMOS = {
   which_principle: WhichPrincipleDemo,
   rank_variants: RankVariantsDemo,
-  best_feedback: BestFeedbackDemo,
+  write_feedback: WriteFeedbackDemo,
 } as const;
 
 /** Renders the same template twice — once wide, once at 390 × 844. */
