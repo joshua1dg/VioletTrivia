@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { PageHeader } from "@/components/admin/ui";
 import * as batches from "@/lib/services/batches";
 import * as questions from "@/lib/services/questions";
@@ -30,6 +32,16 @@ export default async function SessionHostPage({
       <PageHeader
         title={`Room ${formatRoomNumber(session.roomNumber)}`}
         meta={batch.name}
+        actions={
+          <Link
+            href={`/present/${session.id}`}
+            target="_blank"
+            rel="noopener"
+            className="rounded-[8px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
+          >
+            Open presenter display ↗
+          </Link>
+        }
       />
       <HostControls
         sessionId={session.id}

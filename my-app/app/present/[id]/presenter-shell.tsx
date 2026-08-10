@@ -36,6 +36,8 @@ export function PresenterShell({
   initial,
   question,
   tally,
+  joinUrl,
+  joinQrSvg,
 }: {
   sessionId: string;
   roomNumber: number;
@@ -44,6 +46,10 @@ export function PresenterShell({
   initial: SessionChannelInit & { currentPosition: number | null };
   question: ReviewerQuestion | null;
   tally: PresenterTally | null;
+  /** Absolute deep link into the room, built server-side from the request host. */
+  joinUrl: string;
+  /** Pre-rendered QR SVG of `joinUrl` (server-generated, static markup). */
+  joinQrSvg: string;
 }) {
   const router = useRouter();
   const live = useSessionChannel(sessionId, initial);
@@ -85,10 +91,26 @@ export function PresenterShell({
         {live.phase === "ended" && <BigMessage>Session ended.</BigMessage>}
 
         {live.phase === "lobby" && (
-          <BigMessage>
-            Waiting to start — join at <code>/join</code>, room{" "}
-            {formatRoomNumber(roomNumber)}.
-          </BigMessage>
+          <div className="flex h-full flex-col items-center justify-center gap-7 text-center">
+            <p className="text-[22px] leading-[1.4] text-white/85">
+              Scan to join
+            </p>
+            <div
+              className="w-[min(320px,55vw)] overflow-hidden rounded-[18px] bg-white p-4 [&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
+              // Server-generated static markup from the `qrcode` package —
+              // no user content passes through this string.
+              dangerouslySetInnerHTML={{ __html: joinQrSvg }}
+            />
+            <p className="max-w-[52ch] text-[15px] leading-[1.6] text-white/55">
+              {joinUrl}
+              <br />
+              or go to <code className="text-white/85">/join</code> and enter
+              room{" "}
+              <span className="font-medium text-white/85">
+                {formatRoomNumber(roomNumber)}
+              </span>
+            </p>
+          </div>
         )}
 
         {live.phase === "voting" && question && (

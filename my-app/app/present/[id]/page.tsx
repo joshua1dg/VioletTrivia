@@ -1,3 +1,7 @@
+import { headers } from "next/headers";
+import QRCode from "qrcode";
+
+import { formatRoomNumber } from "@/lib/realtime/room-number";
 import * as batches from "@/lib/services/batches";
 import * as questions from "@/lib/services/questions";
 import * as sessions from "@/lib/services/sessions";
@@ -31,6 +35,17 @@ export default async function PresentPage({
       ? await sessions.getTally(session.id, session.currentQuestionId)
       : null;
 
+  // The QR encodes a deep link into the room, built from the REQUEST's own
+  // host — so a presenter opened on a LAN IP (dev) or the deployed domain
+  // hands phones a URL they can actually reach. `/live/[room]` registers and
+  // logs the participant itself (`resolveRoom`), so scanning is equivalent
+  // to typing the room number at /join, minus the optional display name.
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
+  const proto = hdrs.get("x-forwarded-proto") ?? "http";
+  const joinUrl = `${proto}://${host}/live/${formatRoomNumber(session.roomNumber)}`;
+  const joinQrSvg = await QRCode.toString(joinUrl, { type: "svg", margin: 1 });
+
   return (
     <PresenterShell
       sessionId={session.id}
@@ -45,6 +60,8 @@ export default async function PresentPage({
       }}
       question={question}
       tally={tally}
+      joinUrl={joinUrl}
+      joinQrSvg={joinQrSvg}
     />
   );
 }
