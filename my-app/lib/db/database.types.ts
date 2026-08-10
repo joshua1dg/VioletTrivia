@@ -208,6 +208,7 @@ export type Database = {
       principles: {
         Row: {
           active: boolean
+          category: string
           code: string
           full_description: string | null
           id: string
@@ -217,6 +218,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category?: string
           code: string
           full_description?: string | null
           id?: string
@@ -226,6 +228,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category?: string
           code?: string
           full_description?: string | null
           id?: string
