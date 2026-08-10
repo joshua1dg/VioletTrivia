@@ -1,50 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useActionState, useState, useTransition } from "react";
 import Link from "next/link";
-import { Field, Segmented, TextArea, TextInput } from "@/components/admin/form";
+import { useRouter } from "next/navigation";
+
+import { Field, Segmented, TextInput } from "@/components/admin/form";
 import { TurnsEditor } from "@/components/admin/turns-editor";
-import { Chip, GhostButton, PrimaryButton } from "@/components/admin/ui";
+import { Chip } from "@/components/admin/ui";
+import {
+  ConfirmDelete,
+  ErrorNote,
+  SubmitButton,
+  type ErrorLike,
+} from "@/components/feedback";
 import { registry, templateKeys, type QuestionTemplate } from "@/lib/templates/registry";
-import type { PrincipleOption, TemplateKey, Turn } from "@/lib/templates/types";
-import type { Topic } from "@/lib/admin/fixtures";
+import type {
+  PrincipleOption,
+  RankVariantsContent,
+  RankVariantsKey,
+  TemplateKey,
+  Turn,
+  WhichPrincipleContent,
+  WhichPrincipleKey,
+  WriteFeedbackContent,
+  WriteFeedbackKey,
+} from "@/lib/templates/types";
+import type { QuestionStatusInput } from "@/lib/schemas/questions";
+import type { EditableQuestion } from "@/lib/services/questions";
+import type { Topic } from "@/lib/services/topics";
+
+import {
+  archiveQuestion,
+  createQuestion,
+  deleteQuestion,
+  updateQuestion,
+  type ActionResult,
+} from "../actions";
 
 /**
- * Holds the content and answer key for one template, correctly typed.
- *
- * Generic so `content` and `answerKey` are the template's own shapes rather
- * than a union — that's what lets the Author form be strict about what it
- * edits. Mounted with key={template} above, so switching template resets to
- * a blank question of the new shape instead of carrying incompatible data.
+ * One template's Author form, plus the two pieces every template shares
+ * (the excerpt and the reviewer-facing prompt). Fully controlled from
+ * `QuestionEditor` — no local state — so the parent has what it needs at
+ * save time without a second channel back up.
  */
 function TemplateSection<C extends { turns: Turn[] }, K>({
   def,
+  content,
+  answerKey,
+  onContent,
+  onAnswerKey,
   principles,
   prompt,
   onPrompt,
-  onPrincipleCodes,
 }: {
   def: QuestionTemplate<C, K>;
+  content: C;
+  answerKey: K;
+  onContent: (next: C) => void;
+  onAnswerKey: (next: K) => void;
   principles: PrincipleOption[];
   prompt: string;
   onPrompt: (next: string) => void;
-  onPrincipleCodes: (codes: string[]) => void;
 }) {
-  const [{ content, answerKey }, setState] = useState(() => def.empty());
-
-  // Every content change re-derives the principle links, so the rail always
-  // shows what would actually be saved. Done here rather than in an effect —
-  // it's the same event, not a reaction to one.
-  const setContent = (next: C) => {
-    setState((s) => ({ ...s, content: next }));
-    onPrincipleCodes(def.principleCodes(next));
-  };
-
   // The constraint lets the shared turns editor read content.turns for any
   // template. Writing needs one cast: TypeScript can't see that spreading a
   // generic C and replacing a known key still produces a C.
-  const setTurns = (turns: Turn[]) =>
-    setContent({ ...content, turns } as C);
+  const setTurns = (turns: Turn[]) => onContent({ ...content, turns } as C);
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,19 +75,15 @@ function TemplateSection<C extends { turns: Turn[] }, K>({
         label="Prompt shown to reviewers"
         hint="The question itself. Stored as a column, not inside the template payload."
       >
-        <TextInput
-          value={prompt}
-          onChange={onPrompt}
-          placeholder={def.blurb}
-        />
+        <TextInput value={prompt} onChange={onPrompt} placeholder={def.blurb} />
       </Field>
 
       <def.Author
         content={content}
         answerKey={answerKey}
         principles={principles}
-        onContent={setContent}
-        onAnswerKey={(next) => setState((s) => ({ ...s, answerKey: next }))}
+        onContent={onContent}
+        onAnswerKey={onAnswerKey}
       />
     </div>
   );
@@ -79,43 +96,158 @@ function TemplateSection<C extends { turns: Turn[] }, K>({
  */
 function TemplateForm({
   template,
+  content,
+  answerKey,
   principles,
   prompt,
   onPrompt,
-  onPrincipleCodes,
+  onContent,
+  onAnswerKey,
 }: {
   template: TemplateKey;
+  content: unknown;
+  answerKey: unknown;
   principles: PrincipleOption[];
   prompt: string;
   onPrompt: (next: string) => void;
-  onPrincipleCodes: (codes: string[]) => void;
+  onContent: (next: unknown) => void;
+  onAnswerKey: (next: unknown) => void;
 }) {
-  const shared = { principles, prompt, onPrompt, onPrincipleCodes };
+  const shared = { principles, prompt, onPrompt };
   switch (template) {
     case "which_principle":
-      return <TemplateSection def={registry.which_principle} {...shared} />;
+      return (
+        <TemplateSection
+          def={registry.which_principle}
+          content={content as WhichPrincipleContent}
+          answerKey={answerKey as WhichPrincipleKey}
+          onContent={onContent as (next: WhichPrincipleContent) => void}
+          onAnswerKey={onAnswerKey as (next: WhichPrincipleKey) => void}
+          {...shared}
+        />
+      );
     case "rank_variants":
-      return <TemplateSection def={registry.rank_variants} {...shared} />;
+      return (
+        <TemplateSection
+          def={registry.rank_variants}
+          content={content as RankVariantsContent}
+          answerKey={answerKey as RankVariantsKey}
+          onContent={onContent as (next: RankVariantsContent) => void}
+          onAnswerKey={onAnswerKey as (next: RankVariantsKey) => void}
+          {...shared}
+        />
+      );
     case "write_feedback":
-      return <TemplateSection def={registry.write_feedback} {...shared} />;
+      return (
+        <TemplateSection
+          def={registry.write_feedback}
+          content={content as WriteFeedbackContent}
+          answerKey={answerKey as WriteFeedbackKey}
+          onContent={onContent as (next: WriteFeedbackContent) => void}
+          onAnswerKey={onAnswerKey as (next: WriteFeedbackKey) => void}
+          {...shared}
+        />
+      );
   }
 }
 
+/** Display-only re-derivation of principleCodes for the rail — the source of
+ *  truth is still `registry[template].principleCodes`, called again inside
+ *  the service at save time against the validated content. Duplicated here
+ *  (rather than imported) because `lib/services/questions` is server-only
+ *  and this file is a client component. */
+function principleCodesFor(template: TemplateKey, content: unknown): string[] {
+  const derive = registry[template].principleCodes as (content: unknown) => string[];
+  return derive(content);
+}
+
 export function QuestionEditor({
+  mode,
+  id,
   topics,
   principles,
+  initial,
 }: {
+  mode: "new" | "edit";
+  /** Required when mode === "edit". */
+  id?: string;
   topics: Topic[];
   principles: PrincipleOption[];
+  initial?: EditableQuestion;
 }) {
-  const [template, setTemplate] = useState<TemplateKey>("which_principle");
-  const [prompt, setPrompt] = useState("");
-  const [topicSlugs, setTopicSlugs] = useState<string[]>([]);
-  const [codes, setCodes] = useState<string[]>([]);
-  const [note, setNote] = useState("");
+  const router = useRouter();
 
-  const toggle = (list: string[], value: string) =>
-    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+  const [template, setTemplateState] = useState<TemplateKey>(
+    initial?.template ?? "which_principle",
+  );
+  const [prompt, setPrompt] = useState(initial?.prompt ?? "");
+  const [content, setContent] = useState<unknown>(
+    () => initial?.content ?? registry[template].empty().content,
+  );
+  const [answerKey, setAnswerKey] = useState<unknown>(
+    () => initial?.answerKey ?? registry[template].empty().answerKey,
+  );
+  const [topicIds, setTopicIds] = useState<string[]>(initial?.topicIds ?? []);
+
+  const toggleTopic = (topicId: string) =>
+    setTopicIds((ids) =>
+      ids.includes(topicId) ? ids.filter((v) => v !== topicId) : [...ids, topicId],
+    );
+
+  // Switching template resets the question — the three shapes don't convert
+  // into each other (same rule the "New question" hint already stated).
+  function changeTemplate(next: TemplateKey) {
+    setTemplateState(next);
+    const blank = registry[next].empty();
+    setContent(blank.content);
+    setAnswerKey(blank.answerKey);
+  }
+
+  const codes = principleCodesFor(template, content);
+
+  const action = mode === "edit" ? updateQuestion : createQuestion;
+  const [state, dispatch, pending] = useActionState<ActionResult | null, unknown>(
+    action,
+    null,
+  );
+
+  function save(status: QuestionStatusInput) {
+    const payload = {
+      ...(mode === "edit" && id ? { id } : {}),
+      template,
+      prompt,
+      content,
+      answerKey,
+      status,
+      topicIds,
+    };
+    startTransition(() => dispatch(payload));
+  }
+
+  const saveError = state && !state.ok ? state.message : null;
+  const saved = mode === "edit" && state?.ok === true;
+
+  const [archivePending, startArchive] = useTransition();
+  const [archiveError, setArchiveError] = useState<ErrorLike | null>(null);
+
+  function handleArchive() {
+    if (!id) return;
+    startArchive(async () => {
+      const result = await archiveQuestion(id);
+      if (result.ok) router.push("/admin/questions");
+      else setArchiveError(result.message);
+    });
+  }
+
+  async function handleDelete() {
+    if (!id) return { ok: false as const, message: "Missing question id." };
+    const result = await deleteQuestion(id);
+    if (result.ok) {
+      router.push("/admin/questions");
+      return { ok: true as const };
+    }
+    return result;
+  }
 
   return (
     <>
@@ -128,7 +260,9 @@ export function QuestionEditor({
             Questions
           </Link>
           <span className="text-[13px] text-faint-2">/</span>
-          <span className="text-[14px] font-semibold text-ink">New question</span>
+          <span className="text-[14px] font-semibold text-ink">
+            {mode === "edit" ? "Edit question" : "New question"}
+          </span>
         </div>
         {/* Creating a question and putting it in a batch are separate jobs.
             The design combined them ("Add to Batch A"), which quietly makes
@@ -136,10 +270,44 @@ export function QuestionEditor({
             membership is batch_questions, and it's composed on the Batches
             screen against the whole library. */}
         <div className="flex items-center gap-2.5">
-          <GhostButton>Save draft</GhostButton>
-          <PrimaryButton>Add question</PrimaryButton>
+          {mode === "edit" && id && initial?.status !== "archived" && (
+            <SubmitButton
+              type="button"
+              variant="ghost"
+              pending={archivePending}
+              onClick={handleArchive}
+            >
+              Archive
+            </SubmitButton>
+          )}
+          {mode === "edit" && id && (
+            <ConfirmDelete
+              title="Delete this question?"
+              description="Permanent, and only succeeds if nobody has answered it yet. An answered question is refused — archive it instead."
+              onConfirm={handleDelete}
+            />
+          )}
+          <SubmitButton
+            type="button"
+            variant="ghost"
+            pending={pending}
+            onClick={() => save("draft")}
+          >
+            Save draft
+          </SubmitButton>
+          <SubmitButton type="button" pending={pending} onClick={() => save("live")}>
+            {mode === "edit" ? "Save & publish" : "Publish"}
+          </SubmitButton>
         </div>
       </header>
+
+      {(saveError || archiveError || saved) && (
+        <div className="flex flex-col gap-2 px-6 pt-4">
+          <ErrorNote error={saveError} />
+          <ErrorNote error={archiveError} />
+          {saved && <ErrorNote error="Saved." tone="neutral" />}
+        </div>
+      )}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[1fr_400px]">
         <div className="flex flex-col gap-6 overflow-y-auto border-line-2 p-6 xl:border-r">
@@ -149,7 +317,7 @@ export function QuestionEditor({
           >
             <Segmented
               value={template}
-              onChange={setTemplate}
+              onChange={changeTemplate}
               options={templateKeys.map((k) => ({
                 value: k,
                 label: registry[k].label,
@@ -158,12 +326,14 @@ export function QuestionEditor({
           </Field>
 
           <TemplateForm
-            key={template}
             template={template}
+            content={content}
+            answerKey={answerKey}
             principles={principles}
             prompt={prompt}
             onPrompt={setPrompt}
-            onPrincipleCodes={setCodes}
+            onContent={setContent}
+            onAnswerKey={setAnswerKey}
           />
         </div>
 
@@ -175,13 +345,18 @@ export function QuestionEditor({
             <div className="flex flex-wrap gap-2">
               {topics.map((t) => (
                 <Chip
-                  key={t.slug}
-                  active={topicSlugs.includes(t.slug)}
-                  onClick={() => setTopicSlugs(toggle(topicSlugs, t.slug))}
+                  key={t.id}
+                  active={topicIds.includes(t.id)}
+                  onClick={() => toggleTopic(t.id)}
                 >
                   {t.label}
                 </Chip>
               ))}
+              {topics.length === 0 && (
+                <p className="text-[12.5px] text-muted-3">
+                  No topics yet — create one on the Topics screen.
+                </p>
+              )}
             </div>
           </Field>
 
@@ -208,27 +383,9 @@ export function QuestionEditor({
             )}
           </Field>
 
-          <Field
-            label="Discussion note"
-            hint="Shown at the reveal, for whoever is running the room."
-          >
-            <TextArea
-              rows={3}
-              value={note}
-              onChange={setNote}
-              placeholder="Watch for whether people separate the tone from the unverified claim."
-            />
-          </Field>
-
           <p className="mt-auto border-t border-line-2 pt-4 text-[12px] leading-[1.55] text-muted-3">
             Questions land in the library. Put them into a batch from the
             Batches screen, where you can see the whole library at once.
-          </p>
-          <p className="text-[12px] leading-[1.55] text-muted-3">
-            Nothing saves yet — this writes to component state, not Postgres.
-            The shapes it produces are the ones <span className="font-mono">content</span> and{" "}
-            <span className="font-mono">answer_key</span> expect, so wiring it
-            up is a repository call rather than a rewrite.
           </p>
         </aside>
       </div>

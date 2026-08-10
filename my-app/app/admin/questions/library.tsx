@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Chip, StatusPill, Tag } from "@/components/admin/ui";
-import { TEMPLATE_LABEL, type QuestionRow, type Topic } from "@/lib/admin/fixtures";
+import { registry, templateKeys } from "@/lib/templates/registry";
 import type { TemplateKey } from "@/lib/templates/types";
+import type { QuestionSummary } from "@/lib/services/questions";
+import type { Topic } from "@/lib/services/topics";
 
 /**
  * The filters are split into two rows rather than the design's single chip
@@ -11,26 +14,28 @@ import type { TemplateKey } from "@/lib/templates/types";
  * ("Aligned / Misaligned", "Compare two"), which only reads as one control
  * while there are two types. With three templates and a growing topic list
  * they're clearly two different questions.
+ *
+ * Client-side filtering of the already-fetched list — the existing
+ * behaviour, kept as-is per the brief. Archive/delete live on the detail
+ * screen (`/admin/questions/[id]`) rather than per row, so a row here is
+ * just a link.
  */
 export function QuestionLibrary({
   questions,
   topics,
 }: {
-  questions: QuestionRow[];
+  questions: QuestionSummary[];
   topics: Topic[];
 }) {
-  const [topic, setTopic] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string | null>(null);
   const [template, setTemplate] = useState<TemplateKey | null>(null);
   const [search, setSearch] = useState("");
 
   const visible = questions.filter((q) => {
-    if (topic && !q.topics.includes(topic)) return false;
+    if (topicId && !q.topicIds.includes(topicId)) return false;
     if (template && q.template !== template) return false;
     return !(search && !q.excerpt.toLowerCase().includes(search.toLowerCase()));
-
   });
-
-  const templateKeys = Object.keys(TEMPLATE_LABEL) as TemplateKey[];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -39,14 +44,14 @@ export function QuestionLibrary({
           <span className="w-14 text-[11.5px] tracking-[0.04em] text-faint">
             TOPIC
           </span>
-          <Chip active={topic === null} onClick={() => setTopic(null)}>
+          <Chip active={topicId === null} onClick={() => setTopicId(null)}>
             All topics
           </Chip>
           {topics.map((t) => (
             <Chip
-              key={t.slug}
-              active={topic === t.slug}
-              onClick={() => setTopic(topic === t.slug ? null : t.slug)}
+              key={t.id}
+              active={topicId === t.id}
+              onClick={() => setTopicId(topicId === t.id ? null : t.id)}
             >
               {t.label}
             </Chip>
@@ -66,7 +71,7 @@ export function QuestionLibrary({
               active={template === key}
               onClick={() => setTemplate(template === key ? null : key)}
             >
-              {TEMPLATE_LABEL[key]}
+              {registry[key].label}
             </Chip>
           ))}
           <div className="ml-auto flex items-center gap-3">
@@ -94,33 +99,32 @@ export function QuestionLibrary({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {visible.map((q) => (
-          <div
+          <Link
             key={q.id}
+            href={`/admin/questions/${q.id}`}
             className="grid grid-cols-[1fr_180px_140px_150px_96px_84px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface"
           >
             <span className="truncate pr-5 text-[13.5px] text-ink-3">
               {q.excerpt}
             </span>
             <span className="flex flex-wrap gap-1">
-              {q.topics.map((slug) => (
-                <Tag key={slug}>
-                  {topics.find((t) => t.slug === slug)?.label ?? slug}
+              {q.topicIds.map((id) => (
+                <Tag key={id}>
+                  {topics.find((t) => t.id === id)?.label ?? id}
                 </Tag>
               ))}
             </span>
-            <span className="text-[12.5px] text-muted-2">
-              {TEMPLATE_LABEL[q.template]}
-            </span>
+            <span className="text-[12.5px] text-muted-2">{q.templateLabel}</span>
             <span className="flex flex-wrap gap-1 font-mono text-[11.5px] text-muted">
-              {q.principles.map((code) => (
+              {q.principleCodes.map((code) => (
                 <span key={code}>{code}</span>
               ))}
             </span>
             <span className="text-[12.5px] text-muted-2 tabular-nums">
-              {q.responses}
+              {q.responseCount}
             </span>
             <StatusPill status={q.status} />
-          </div>
+          </Link>
         ))}
 
         {visible.length === 0 && (
