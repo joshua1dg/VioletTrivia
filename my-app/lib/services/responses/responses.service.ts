@@ -7,6 +7,7 @@ import type { SubmitAnswerInput } from "@/lib/schemas/responses";
 import * as batches from "@/lib/services/batches";
 import * as participants from "@/lib/services/participants";
 import * as questions from "@/lib/services/questions";
+import { answerSchema } from "@/lib/templates/answers";
 
 import { buildReveal, type Reveal } from "./reveal.util";
 
@@ -58,6 +59,24 @@ export async function submitAsync(
     throw new AppError("forbidden", "That question isn't part of your set.");
   }
 
+  // Loaded BEFORE the insert, because validating the answer needs the
+  // template. Harmless ordering on this path: the caller is about to be
+  // handed the key in the reveal anyway — async participants read keys by
+  // design. (The live path must never do this; its keyless equivalent is in
+  // `live-submit.service.ts`.)
+  const question = await questions.getWithKey(input.questionId);
+
+  // Per-template completeness, the same schema the submit button gates on
+  // (`lib/templates/answers`). The action-boundary schema only knows
+  // `answer` is an object; without this an empty `{}` records fine, grades
+  // 0, and tallies as nothing.
+  if (!answerSchema[question.template].safeParse(input.answer).success) {
+    throw new AppError(
+      "validation",
+      "That answer looks incomplete — nothing was recorded.",
+    );
+  }
+
   // Idempotent, and cheap insurance: a participant whose registration was
   // lost would otherwise hit a foreign-key error they can do nothing about.
   await participants.ensureParticipant(input.participantId, batch.id);
@@ -84,9 +103,6 @@ export async function submitAsync(
     alreadyAnswered = true;
     response = await findExisting(input.participantId, batch.id, input.questionId);
   }
-
-  // The key is loaded ONLY here, after the answer is safely recorded.
-  const question = await questions.getWithKey(input.questionId);
 
   return {
     alreadyAnswered,

@@ -5,8 +5,10 @@ import { QuestionShell } from "@/components/question/shell";
 import { WhyNote } from "@/components/question/why-note";
 import type { ReviewerQuestion } from "@/lib/services/questions";
 import type { Reveal } from "@/lib/services/responses";
+import { isAnswerComplete } from "@/lib/templates/answers";
 import { registry } from "@/lib/templates/registry";
-import type { Answer, RevealProps, ReviewProps, TemplateKey } from "@/lib/templates/types";
+import type { RevealProps, ReviewProps, TemplateKey } from "@/lib/templates/types";
+import type { Answer } from "@/lib/templates/types";
 
 /**
  * One drawn question, in one of three modes. All three share `QuestionShell`
@@ -50,26 +52,14 @@ const revealComponents = {
 } as Record<TemplateKey, ComponentType<RevealProps<unknown, unknown>>>;
 
 /**
- * Whether the current draft is complete enough to submit. `ReviewProps`
- * carries no such signal — the registry describes what a template LOOKS
- * like, not when an answer is "enough" to send — so this is one small,
- * contained branch on `template`, mirroring the three separate disabled
- * rules already hardcoded per template in `app/templates/demos.tsx`. Flagged
- * to the orchestrator (F4 report) as a candidate for a fourth registry
- * member if a later template needs the same thing.
+ * Whether the current draft is complete enough to submit — the per-template
+ * answer schemas in `lib/templates/answers.ts`, the same ones the submit
+ * services enforce, so this gate and the server can't disagree. (Rankings
+ * pass from the moment the card renders: the Review component commits its
+ * default order into the answer on mount.)
  */
 function isAnswered(template: TemplateKey, answer: Answer): boolean {
-  switch (template) {
-    case "which_principle":
-      return Boolean(answer.option);
-    case "write_feedback":
-      return Boolean(answer.feedback?.trim());
-    case "rank_variants":
-      // Ranking always has an order — the Review component commits its
-      // default into the answer on mount — so there is nothing to withhold
-      // submission on, matching the demo.
-      return true;
-  }
+  return isAnswerComplete(template, answer);
 }
 
 export function QuestionStep({

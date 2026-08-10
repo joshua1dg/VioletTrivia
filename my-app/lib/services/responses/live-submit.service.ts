@@ -1,9 +1,11 @@
 import "server-only";
 
-import { isAppError } from "@/lib/errors";
+import { AppError, isAppError } from "@/lib/errors";
+import * as questionsRepo from "@/lib/repos/questions";
 import * as repo from "@/lib/repos/responses";
 import type { SubmitLiveAnswerInput } from "@/lib/schemas/responses";
 import * as participants from "@/lib/services/participants";
+import { answerSchema } from "@/lib/templates/answers";
 
 /**
  * THE LIVE WRITE PATH.
@@ -30,6 +32,21 @@ export type LiveSubmitResult = { ok: true; alreadyAnswered: boolean };
 export async function submitLive(
   input: SubmitLiveAnswerInput,
 ): Promise<LiveSubmitResult> {
+  // The action-boundary schema only knows `answer` is an object; whether it
+  // is a COMPLETE answer depends on the question's template. Enforced here
+  // as well as by the disabled submit button, because a button state is not
+  // a guarantee — an empty `{}` in `responses` grades 0 and tallies as
+  // nothing, which reads as data loss on the presenter. `getForReviewer` is
+  // the KEYLESS read; the no-key rule above holds (`lib/templates/answers`
+  // is schemas only).
+  const question = await questionsRepo.getForReviewer(input.questionId);
+  if (!answerSchema[question.template].safeParse(input.answer).success) {
+    throw new AppError(
+      "validation",
+      "That answer looks incomplete — nothing was recorded.",
+    );
+  }
+
   await participants.ensureParticipant(input.participantId);
 
   try {

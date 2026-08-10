@@ -30,6 +30,7 @@ import {
   writeFeedbackKey,
   writeFeedbackPrompt,
 } from "@/lib/templates/write-feedback/fixture";
+import { isAnswerComplete } from "@/lib/templates/answers";
 import type { Answer } from "@/lib/templates/types";
 
 /**
@@ -95,7 +96,7 @@ function WhichPrincipleDemo() {
           ? { label: "Next item", onClick: s.reset }
           : {
               label: "Submit",
-              disabled: !s.answer.option,
+              disabled: !isAnswerComplete("which_principle", s.answer),
               onClick: () => s.setRevealed(true),
             }
       }
@@ -137,7 +138,11 @@ function RankVariantsDemo() {
       action={
         s.revealed
           ? { label: "Next item", onClick: s.reset }
-          : { label: "Submit ranking", onClick: () => s.setRevealed(true) }
+          : {
+              label: "Submit ranking",
+              disabled: !isAnswerComplete("rank_variants", s.answer),
+              onClick: () => s.setRevealed(true),
+            }
       }
     >
       {s.revealed ? (
@@ -179,8 +184,7 @@ function WriteFeedbackDemo() {
           ? { label: "Next item", onClick: s.reset }
           : {
               label: "Submit & reveal",
-              // The answer is prose, so "answered" means they wrote something.
-              disabled: !s.answer.feedback?.trim(),
+              disabled: !isAnswerComplete("write_feedback", s.answer),
               onClick: () => s.setRevealed(true),
             }
       }

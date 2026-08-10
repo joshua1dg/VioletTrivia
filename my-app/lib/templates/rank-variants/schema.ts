@@ -33,6 +33,14 @@ export type RankVariantsContentHydrated = RankVariantsContentStored;
 
 export type RankVariantsContent = RankVariantsContentHydrated;
 
+/** A COMPLETE answer: a non-empty order. The Review component commits its
+ * default order on mount, so an untouched ranking still passes — this
+ * exists to stop an EMPTY `{}` from ever being recorded again (the
+ * empty-tally bug of 2026-08-10). */
+export const rankVariantsAnswer = z.object({
+  order: z.array(z.string()).min(1),
+});
+
 export const rankVariantsAnswerKey = z.object({
   /** Best first. grade is exact-match against this. */
   keyOrder: z.array(z.string()),

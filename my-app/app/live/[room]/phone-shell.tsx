@@ -10,6 +10,7 @@ import { WhyNote } from "@/components/question/why-note";
 import type { ReviewerQuestion } from "@/lib/services/questions";
 import { useSessionChannel, type SessionChannelInit } from "@/lib/realtime/session-channel";
 import { formatSeconds, useCountdown } from "@/lib/realtime/use-countdown";
+import { isAnswerComplete } from "@/lib/templates/answers";
 import { registry } from "@/lib/templates/registry";
 import type { Answer } from "@/lib/templates/types";
 
@@ -270,17 +271,9 @@ function ReviewForCurrent({
   }
 }
 
+/** The registry-level answer schemas, so this gate can't drift from what
+ * the server accepts. Rankings pass from the moment the card renders — the
+ * Review component commits its default order into the answer on mount. */
 function canSubmit(current: ReviewerQuestion, answer: Answer): boolean {
-  switch (current.template) {
-    case "which_principle":
-      return !!answer.option;
-    case "rank_variants":
-      // A complete ranking exists from the moment the card renders — the
-      // Review component commits its default order into the answer on mount
-      // — so reordering is optional and submitting isn't gated on touching
-      // it. Same as the /templates demo.
-      return true;
-    case "write_feedback":
-      return !!answer.feedback?.trim();
-  }
+  return isAnswerComplete(current.template, answer);
 }

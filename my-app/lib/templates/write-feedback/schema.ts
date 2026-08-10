@@ -26,6 +26,11 @@ export type WriteFeedbackContentHydrated = WriteFeedbackContentStored;
 
 export type WriteFeedbackContent = WriteFeedbackContentHydrated;
 
+/** A COMPLETE answer: actual prose, not whitespace. */
+export const writeFeedbackAnswer = z.object({
+  feedback: z.string().trim().min(1),
+});
+
 export const writeFeedbackAnswerKey = z.object({
   /** The pill at the top of the reveal, e.g. "Rationale is weak". */
   verdict: z.string(),

@@ -58,6 +58,14 @@ export type WhichPrincipleContentHydrated = z.infer<
  */
 export type WhichPrincipleContent = WhichPrincipleContentHydrated;
 
+/** A COMPLETE answer to this template — what the submit gate and both
+ * submit services check. The shared `answer` schema in `common.ts` stays
+ * loose on purpose (it parses stored rows); this is the strict per-template
+ * face of it. */
+export const whichPrincipleAnswer = z.object({
+  option: z.string().min(1),
+});
+
 export const whichPrincipleAnswerKey = z.object({
   key: z.string(),
   /** Paragraphs per option — the winner and the "not the issue here" one. */
