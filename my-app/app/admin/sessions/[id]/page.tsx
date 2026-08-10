@@ -33,6 +33,10 @@ export default async function SessionHostPage({
         title={`Room ${formatRoomNumber(session.roomNumber)}`}
         meta={batch.name}
         actions={
+          // Still the only way the host opens the big screen. That screen now
+          // carries its own copy of `HostControls` in a bottom bar, so this
+          // page and the presenter are interchangeable places to run the room
+          // — two mounts of the same component on the same Realtime row.
           <Link
             href={`/present/${session.id}`}
             target="_blank"

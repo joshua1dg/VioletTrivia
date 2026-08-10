@@ -12,6 +12,18 @@ import { PresenterShell } from "./presenter-shell";
  * Server Component: current question (keyless, `getForReviewer`) plus, only
  * on `revealed`, the tally (`sessions.getTally` — staff-gated, loads the key
  * once, server-side). `params` is async in Next 16.
+ *
+ * `hostControls` puts the host's own controls in a bar at the bottom of the
+ * shell, so running the room and showing the room are one screen. Safe to
+ * embed on two counts, both checked rather than assumed:
+ * `app/present/[id]/layout.tsx` calls `requireStaff()` and is THE
+ * authorization boundary for this route tree (PLAN §9 F5), and every action
+ * the controls call lands in `lib/services/sessions`, which calls
+ * `requireStaff()` inside each mutation — the guard travels with the business
+ * logic, because a Server Action is a public endpoint and not rendering a
+ * control protects nothing (§7.2). Everything the bar needs — position,
+ * totals, the question's template label — is already loaded here for the
+ * display itself; embedding it costs no extra query.
  */
 export default async function PresentPage({
   params,
@@ -63,6 +75,7 @@ export default async function PresentPage({
       tally={tally}
       joinUrl={joinUrl}
       joinQrSvg={joinQrSvg}
+      hostControls
     />
   );
 }
