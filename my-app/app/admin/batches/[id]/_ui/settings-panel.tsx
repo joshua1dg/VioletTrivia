@@ -1,25 +1,32 @@
 "use client";
 
-// Real "use client" — owns the form fields and three independent pending
-// states (save / status / active-pool toggle) via hooks.
+// "use client" because every control here is bound to a handler prop. It is
+// NOT the state owner any more — composer.tsx is (same as the library and
+// queue panels). It also owns no pending state and calls no Server Action:
+// there is exactly one save on this screen, and it lives in the composer's
+// footer bar.
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-
-import {
-  ConfirmDelete,
-  ErrorNote,
-  SubmitButton,
-  type ConfirmDeleteOutcome,
-  type ErrorLike,
-} from "@/components/feedback";
 import type { BatchStatus, BatchWithCounts } from "@/lib/services/batches";
-
-import { deleteBatch, setActiveAsync, setStatus, updateBatch } from "../../actions";
 
 const STATUSES: BatchStatus[] = ["draft", "active", "inactive"];
 
-/** `<input type="datetime-local">` wants local time with no offset. */
+/**
+ * The settings panel's fields in the shape the *inputs* want them — strings
+ * for the two free-text/numeric fields and for `<input type="datetime-local">`,
+ * which wants local time with no offset. The conversion in both directions
+ * lives here rather than in the composer so that "how a batch column is
+ * spelled in a form control" stays next to the control that spells it.
+ */
+export type SettingsDraft = {
+  name: string;
+  audience: string;
+  /** `YYYY-MM-DDTHH:mm`, local, or "" for never. */
+  expiresAt: string;
+  sampleSize: string;
+  status: BatchStatus;
+  isActiveAsync: boolean;
+};
+
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -29,63 +36,70 @@ function toLocalInputValue(iso: string | null): string {
   )}:${pad(d.getMinutes())}`;
 }
 
-export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
-  const router = useRouter();
+/** Server row → editable draft. The composer seeds its state with this. */
+export function settingsDraftFromBatch(batch: BatchWithCounts): SettingsDraft {
+  return {
+    name: batch.name,
+    audience: batch.audience ?? "",
+    expiresAt: toLocalInputValue(batch.expiresAt),
+    sampleSize: batch.asyncSampleSize?.toString() ?? "",
+    status: batch.status,
+    isActiveAsync: batch.isActiveAsync,
+  };
+}
 
-  const [name, setName] = useState(batch.name);
-  const [audience, setAudience] = useState(batch.audience ?? "");
-  const [expiresAt, setExpiresAt] = useState(toLocalInputValue(batch.expiresAt));
-  const [sampleSize, setSampleSize] = useState(
-    batch.asyncSampleSize?.toString() ?? "",
+/** Editable draft → the `settings` half of the `saveBatch` payload. */
+export function settingsPatchFromDraft(draft: SettingsDraft) {
+  return {
+    name: draft.name,
+    audience: draft.audience.trim() === "" ? null : draft.audience.trim(),
+    // `<input type="datetime-local">` only ever yields "" or a well-formed
+    // local timestamp, so this conversion can't produce an Invalid Date.
+    expiresAt:
+      draft.expiresAt === "" ? null : new Date(draft.expiresAt).toISOString(),
+    // A non-numeric typo becomes NaN and the action's zod parse rejects it as
+    // a returned error — the same path it took when this panel saved itself.
+    asyncSampleSize:
+      draft.sampleSize.trim() === "" ? null : Number(draft.sampleSize),
+    status: draft.status,
+    isActiveAsync: draft.isActiveAsync,
+  };
+}
+
+/** True when two drafts describe the same batch — the composer's dirty check. */
+export function settingsEqual(a: SettingsDraft, b: SettingsDraft): boolean {
+  return (
+    a.name === b.name &&
+    a.audience === b.audience &&
+    a.expiresAt === b.expiresAt &&
+    a.sampleSize === b.sampleSize &&
+    a.status === b.status &&
+    a.isActiveAsync === b.isActiveAsync
   );
-  const [error, setError] = useState<ErrorLike | null>(null);
+}
 
-  const [savePending, startSave] = useTransition();
-  const [statusPending, startStatus] = useTransition();
-  const [activePending, startActive] = useTransition();
-
-  function saveSettings() {
-    setError(null);
-    startSave(async () => {
-      const result = await updateBatch(batch.id, {
-        name,
-        audience: audience.trim() === "" ? null : audience.trim(),
-        expiresAt: expiresAt === "" ? null : new Date(expiresAt).toISOString(),
-        asyncSampleSize: sampleSize.trim() === "" ? null : Number(sampleSize),
-      });
-      if (!result.ok) setError(result.message);
-    });
-  }
-
-  function changeStatus(next: BatchStatus) {
-    setError(null);
-    startStatus(async () => {
-      const result = await setStatus(batch.id, next);
-      if (!result.ok) setError(result.message);
-    });
-  }
-
-  function toggleActive(next: boolean) {
-    setError(null);
-    startActive(async () => {
-      const result = await setActiveAsync(batch.id, next);
-      if (!result.ok) setError(result.message);
-    });
-  }
-
-  async function confirmedDelete(): Promise<ConfirmDeleteOutcome> {
-    const result = await deleteBatch(batch.id);
-    if (!result.ok) return { ok: false, message: result.message };
-    router.push("/admin/batches");
-  }
-
+/**
+ * The left column: everything about the batch that isn't its question list.
+ *
+ * Status and the active-async flag used to write immediately, one Server
+ * Action per click, while the four text fields waited for a "Save settings"
+ * button — two save idioms inside one panel. They are all plain edits to one
+ * batch now, and they all commit through the composer's single footer save.
+ */
+export function SettingsPanel({
+  draft,
+  onChange,
+}: {
+  draft: SettingsDraft;
+  onChange: (patch: Partial<SettingsDraft>) => void;
+}) {
   return (
     <div className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-line-2 p-5">
       <div className="flex flex-col gap-1.5">
         <label className="text-[11.5px] tracking-[0.04em] text-faint">NAME</label>
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={draft.name}
+          onChange={(e) => onChange({ name: e.target.value })}
           className="rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none"
         />
       </div>
@@ -95,8 +109,8 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
           AUDIENCE
         </label>
         <input
-          value={audience}
-          onChange={(e) => setAudience(e.target.value)}
+          value={draft.audience}
+          onChange={(e) => onChange({ audience: e.target.value })}
           placeholder="reviewers, pod leads…"
           className="rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none"
         />
@@ -108,8 +122,8 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
         </label>
         <input
           type="datetime-local"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
+          value={draft.expiresAt}
+          onChange={(e) => onChange({ expiresAt: e.target.value })}
           className="rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none"
         />
         <span className="text-[11.5px] text-muted-3">
@@ -123,16 +137,12 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
         </label>
         <input
           inputMode="numeric"
-          value={sampleSize}
-          onChange={(e) => setSampleSize(e.target.value)}
+          value={draft.sampleSize}
+          onChange={(e) => onChange({ sampleSize: e.target.value })}
           placeholder="blank = everyone answers all"
           className="rounded-[7px] border border-line px-3 py-1.5 text-[13px] text-ink-4 outline-none"
         />
       </div>
-
-      <SubmitButton type="button" onClick={saveSettings} pending={savePending}>
-        Save settings
-      </SubmitButton>
 
       <div className="flex flex-col gap-1.5 border-t border-line-2 pt-4">
         <label className="text-[11.5px] tracking-[0.04em] text-faint">
@@ -143,11 +153,10 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
             <button
               key={s}
               type="button"
-              disabled={statusPending}
-              onClick={() => changeStatus(s)}
-              aria-pressed={batch.status === s}
-              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[12.5px] capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                batch.status === s
+              onClick={() => onChange({ status: s })}
+              aria-pressed={draft.status === s}
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[12.5px] capitalize transition-colors ${
+                draft.status === s
                   ? "border-violet-line bg-violet-tint-2 text-violet-ink"
                   : "border-line text-muted hover:bg-surface"
               }`}
@@ -156,7 +165,7 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
             </button>
           ))}
         </div>
-        {batch.status === "inactive" && (
+        {draft.status === "inactive" && (
           <span className="text-[11.5px] text-muted-3">
             Read-only, not off — anyone who already answered can still see it.
           </span>
@@ -166,38 +175,15 @@ export function SettingsPanel({ batch }: { batch: BatchWithCounts }) {
       <label className="flex flex-wrap items-center gap-2 border-t border-line-2 pt-4 text-[13px] text-ink-4">
         <input
           type="checkbox"
-          checked={batch.isActiveAsync}
-          disabled={activePending}
-          onChange={(e) => toggleActive(e.target.checked)}
+          checked={draft.isActiveAsync}
+          onChange={(e) => onChange({ isActiveAsync: e.target.checked })}
         />
         Active async pool
         <span className="text-[11.5px] text-muted-3">
           Only one batch may hold this at a time — activating this one
-          deactivates whichever batch has it now.
+          deactivates whichever batch has it now, on save.
         </span>
       </label>
-
-      <ErrorNote error={error} />
-
-      <div className="mt-auto border-t border-line-2 pt-4">
-        <ConfirmDelete
-          title="Delete this batch?"
-          description={
-            <>
-              Removes {batch.questionCount} question
-              {batch.questionCount === 1 ? "" : "s"} from its queue.{" "}
-              {batch.responseCount > 0
-                ? `${batch.responseCount} recorded response${
-                    batch.responseCount === 1 ? "" : "s"
-                  } keep their answers but lose the batch link.`
-                : "No responses have been recorded against it yet."}{" "}
-              A batch with a live session still open can&rsquo;t be deleted —
-              end the session first.
-            </>
-          }
-          onConfirm={confirmedDelete}
-        />
-      </div>
     </div>
   );
 }

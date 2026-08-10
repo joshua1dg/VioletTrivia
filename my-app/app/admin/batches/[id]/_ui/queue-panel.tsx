@@ -3,46 +3,35 @@
 // "use client" — the same reasoning as question-library-panel.tsx: this is
 // the controlled arrow-reorder leaf, not the state owner (composer.tsx is).
 
-import { ErrorNote, SubmitButton, type ErrorLike } from "@/components/feedback";
 import type { QuestionSummary } from "@/lib/services/questions";
 
 /**
  * The right column: the batch's ordered queue. Reorders with arrows, not
  * drag — matching T2's rank-variants template, and the design's own
  * rationale for it (README trap: "the review list is keyed by position, not
- * by id"). `dirty` only changes the button's caption; it never disables the
- * save (an unchanged save is a harmless no-op, not worth blocking).
+ * by id").
+ *
+ * It has no save control of its own. Reordering, removing and ticking are
+ * all edits to the same batch as the name and the status are, and they
+ * commit together through the composer's one footer save.
  */
 export function QueuePanel({
   queue,
   questionsById,
-  dirty,
-  pending,
-  error,
   onMove,
   onRemove,
-  onSave,
   activeWarning,
 }: {
   queue: string[];
   questionsById: Map<string, QuestionSummary>;
-  dirty: boolean;
-  pending: boolean;
-  error: ErrorLike | null;
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (id: string) => void;
-  onSave: () => void;
   activeWarning: boolean;
 }) {
   return (
     <div className="flex w-96 shrink-0 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-line-2 px-5 py-3">
-        <span className="text-[11.5px] tracking-[0.04em] text-faint">
-          QUEUE · {queue.length}
-        </span>
-        <SubmitButton type="button" onClick={onSave} pending={pending}>
-          {dirty ? "Save queue" : "Saved"}
-        </SubmitButton>
+      <div className="border-b border-line-2 px-5 py-3 text-[11.5px] tracking-[0.04em] text-faint">
+        QUEUE · {queue.length}
       </div>
 
       {/*
@@ -51,16 +40,18 @@ export function QueuePanel({
        * user. It's the README/PLAN §5.15 caveat: the async draw is a pure
        * function of the batch's CURRENT question list, so this write
        * reshuffles every participant's set the instant it saves.
+       *
+       * `activeWarning` now tracks the DRAFT flag, not the saved one, so
+       * ticking "active async pool" warns before the write rather than after
+       * it — hence the tense-neutral wording.
        */}
       {activeWarning && (
         <p className="border-b border-warn-line bg-warn-tint px-5 py-2.5 text-[12px] leading-[1.5] text-warn-ink">
-          This batch is the active async pool. Saving this queue reshuffles
-          every participant&rsquo;s draw — anyone mid-way through can come
-          back to a different set next time they load the link.
+          Active async pool — saving reshuffles every participant&rsquo;s
+          draw. Anyone mid-way through can come back to a different set next
+          time they load the link.
         </p>
       )}
-
-      <ErrorNote error={error} />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {queue.map((id, index) => {
