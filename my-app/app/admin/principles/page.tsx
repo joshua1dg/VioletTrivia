@@ -1,6 +1,11 @@
-import { PageHeader, PrimaryButton } from "@/components/admin/ui";
+import { PageHeader } from "@/components/admin/ui";
 import { principleUsage, principles } from "@/lib/admin/fixtures";
 
+/**
+ * Read-only on purpose. The rubric is fixed — codes are inserted straight
+ * into the database, not authored here — so this screen exists to look them
+ * up while writing questions, and to show which ones still lack text.
+ */
 export default function PrinciplesPage() {
   const incomplete = principles.filter((p) => !p.name || !p.descriptor);
 
@@ -8,8 +13,7 @@ export default function PrinciplesPage() {
     <>
       <PageHeader
         title="Principles"
-        meta={`${principles.length} codes · ${incomplete.length} need writing`}
-        actions={<PrimaryButton>New principle</PrimaryButton>}
+        meta={`${principles.length} codes · reference only, seeded in the database`}
       />
 
       <div className="flex flex-col gap-4 p-6">

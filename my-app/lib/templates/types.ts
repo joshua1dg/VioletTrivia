@@ -49,7 +49,11 @@ export type CommonContent = {
 export type WhichPrincipleContent = CommonContent & {
   turns: Turn[];
   inPlay: { code: string; name: string; descriptor: string }[];
-  options: { id: string; principleCode: string; subtext: string }[];
+  /**
+   * `subtext` is the question-specific line under each option. Nothing in the
+   * authoring form writes it any more, so it renders only when present.
+   */
+  options: { id: string; principleCode: string; subtext?: string }[];
 };
 
 export type WhichPrincipleKey = {

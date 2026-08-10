@@ -137,7 +137,9 @@ export function RankVariantsAuthor({
                       type="button"
                       onClick={() => moveKey(index, index - 1)}
                       disabled={index === 0}
-                      aria-label={`Move up to position ${index}`}
+                      aria-label={
+                        index === 0 ? "Already first" : `Move up to position ${index}`
+                      }
                       className="cursor-pointer px-1 text-[10px] text-muted-3 disabled:cursor-not-allowed disabled:text-line-4"
                     >
                       ▲
@@ -146,7 +148,11 @@ export function RankVariantsAuthor({
                       type="button"
                       onClick={() => moveKey(index, index + 1)}
                       disabled={index === answerKey.keyOrder.length - 1}
-                      aria-label={`Move down to position ${index + 2}`}
+                      aria-label={
+                        index === answerKey.keyOrder.length - 1
+                          ? "Already last"
+                          : `Move down to position ${index + 2}`
+                      }
                       className="cursor-pointer px-1 text-[10px] text-muted-3 disabled:cursor-not-allowed disabled:text-line-4"
                     >
                       ▼

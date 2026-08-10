@@ -52,21 +52,11 @@ export function WhichPrincipleAuthor({
     const options = inPlay.map((p) => ({
       id: p.code,
       principleCode: p.code,
-      subtext:
-        content.options.find((o) => o.principleCode === p.code)?.subtext ?? "",
     }));
 
     onContent({ ...content, inPlay, options });
     if (!next.includes(answerKey.key)) onAnswerKey({ ...answerKey, key: "" });
   };
-
-  const setSubtext = (code: string, subtext: string) =>
-    onContent({
-      ...content,
-      options: content.options.map((o) =>
-        o.principleCode === code ? { ...o, subtext } : o,
-      ),
-    });
 
   const setExplanation = (code: string, text: string) =>
     onAnswerKey({
@@ -101,20 +91,6 @@ export function WhichPrincipleAuthor({
           ))}
         </div>
       </Field>
-
-      {content.options.map((opt) => (
-        <Field
-          key={opt.id}
-          label={`${opt.principleCode} — hint shown under this option`}
-          hint="Question-specific. What would make a reviewer choose this code here?"
-        >
-          <TextInput
-            value={opt.subtext}
-            onChange={(v) => setSubtext(opt.id, v)}
-            placeholder="The content is all there; it's the shape of the sentence that costs the reader."
-          />
-        </Field>
-      ))}
 
       <KeySection>
         <Field label="Which code does this excerpt actually fail?">

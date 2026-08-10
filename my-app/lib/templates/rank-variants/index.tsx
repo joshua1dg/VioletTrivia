@@ -43,6 +43,13 @@ function Chevron({ dir }: { dir: "up" | "down" }) {
   );
 }
 
+/**
+ * Arrows with the rank underneath.
+ *
+ * The rank belongs here, next to the controls, because it describes the SLOT
+ * — it stays put while cards move through it. The letter badge on the card is
+ * the opposite: it's identity, and travels with the card.
+ */
 function MoveControls({
   index,
   total,
@@ -56,36 +63,59 @@ function MoveControls({
     "flex h-4 w-6 items-center justify-center rounded transition-colors outline-none focus-visible:ring-2 focus-visible:ring-violet";
   const enabled = "cursor-pointer text-muted-3 hover:bg-line-3 hover:text-ink-4";
   const disabled = "cursor-not-allowed text-line-4";
+  const isFirst = index === 0;
+  const isLast = index === total - 1;
 
   return (
-    <span className="flex shrink-0 flex-col gap-0.5">
+    <span className="flex shrink-0 flex-col items-center gap-0.5">
       <button
         type="button"
         onClick={() => onMove(index - 1)}
-        disabled={index === 0}
-        aria-label={`Move up to position ${index}`}
-        className={`${base} ${index === 0 ? disabled : enabled}`}
+        disabled={isFirst}
+        // Screen readers announce disabled buttons too, so the label has to
+        // stay sensible at the ends rather than naming a position that
+        // doesn't exist.
+        aria-label={isFirst ? "Already first" : `Move up to position ${index}`}
+        className={`${base} ${isFirst ? disabled : enabled}`}
       >
         <Chevron dir="up" />
       </button>
       <button
         type="button"
         onClick={() => onMove(index + 1)}
-        disabled={index === total - 1}
-        aria-label={`Move down to position ${index + 2}`}
-        className={`${base} ${index === total - 1 ? disabled : enabled}`}
+        disabled={isLast}
+        aria-label={isLast ? "Already last" : `Move down to position ${index + 2}`}
+        className={`${base} ${isLast ? disabled : enabled}`}
       >
         <Chevron dir="down" />
       </button>
+      <span
+        className={`mt-0.5 text-[12px] font-semibold tabular-nums @3xl:text-[13px] ${
+          index === 0 ? "text-violet-ink" : "text-muted-3"
+        }`}
+      >
+        {index + 1}
+      </span>
     </span>
   );
 }
 
-function RankBadge({
-  rank,
+/**
+ * The variant's identity letter. Derived from its position in the authored
+ * options array, not from its id, so the fixture reads A B C D rather than
+ * whatever order the ids happen to be in.
+ */
+function letterMap(options: { id: string }[]) {
+  return new Map(
+    options.map((o, i) => [o.id, String.fromCharCode(65 + i)] as const),
+  );
+}
+
+function LetterBadge({
+  letter,
   tone,
 }: {
-  rank: number;
+  letter: string;
   tone: "lead" | "rest" | "correct";
 }) {
   const bg =
@@ -96,9 +126,9 @@ function RankBadge({
         : "bg-line-3 text-muted";
   return (
     <span
-      className={`flex size-[22px] shrink-0 items-center justify-center rounded-md text-[12px] font-semibold @3xl:size-[26px] @3xl:rounded-[7px] @3xl:text-[13px] ${bg}`}
+      className={`flex size-[22px] shrink-0 items-center justify-center rounded-md font-mono text-[12px] font-semibold @3xl:size-[26px] @3xl:rounded-[7px] @3xl:text-[13px] ${bg}`}
     >
-      {rank}
+      {letter}
     </span>
   );
 }
@@ -110,6 +140,7 @@ export function RankVariantsReview({
   onAnswer,
 }: ReviewProps<RankVariantsContent>) {
   const order = answer.order ?? content.options.map((o) => o.id);
+  const letters = letterMap(content.options);
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= order.length) return;
@@ -158,7 +189,10 @@ export function RankVariantsReview({
                     onMove={(to) => move(index, to)}
                   />
                 </span>
-                <RankBadge rank={index + 1} tone={index === 0 ? "lead" : "rest"} />
+                <LetterBadge
+                  letter={letters.get(id) ?? "?"}
+                  tone={index === 0 ? "lead" : "rest"}
+                />
               </span>
 
               <span className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -192,6 +226,7 @@ export function RankVariantsReveal({
   answer,
 }: RevealProps<RankVariantsContent, RankVariantsKey>) {
   const yours = answer.order ?? content.options.map((o) => o.id);
+  const letters = letterMap(content.options);
 
   return (
     <div className="flex flex-col gap-4">
@@ -215,10 +250,22 @@ export function RankVariantsReveal({
                 index === 0 ? "border-ok-line bg-ok-tint" : "border-line bg-white"
               }`}
             >
-              <RankBadge
-                rank={index + 1}
-                tone={index === 0 ? "correct" : "rest"}
-              />
+              {/* No arrows here, so the rank sits in the badge — and the
+                  letter comes along so you can match each card against the
+                  order you submitted. */}
+              <span className="flex shrink-0 flex-col items-center gap-1">
+                <LetterBadge
+                  letter={letters.get(id) ?? "?"}
+                  tone={index === 0 ? "correct" : "rest"}
+                />
+                <span
+                  className={`text-[12px] font-semibold tabular-nums @3xl:text-[13px] ${
+                    index === 0 ? "text-ok-ink" : "text-muted-3"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+              </span>
 
               <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <span className="text-[12.5px] leading-[1.55] text-ink-3 @3xl:text-[15px]">

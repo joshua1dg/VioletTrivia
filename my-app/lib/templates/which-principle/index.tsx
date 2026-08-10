@@ -79,9 +79,11 @@ export function WhichPrincipleReview({
                 >
                   {opt.principleCode} — {principle?.name}
                 </span>
-                <span className="text-[12px] leading-normal text-muted @3xl:text-[13px]">
-                  {opt.subtext}
-                </span>
+                {opt.subtext && (
+                  <span className="text-[12px] leading-normal text-muted @3xl:text-[13px]">
+                    {opt.subtext}
+                  </span>
+                )}
               </span>
             </OptionCard>
           );
