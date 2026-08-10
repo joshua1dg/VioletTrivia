@@ -84,8 +84,10 @@ create type session_phase as enum ('lobby', 'voting', 'locked', 'revealed', 'end
 -- not take effect until the token refreshes, and you cannot join on it to
 -- populate a "pick a host" list.
 --
--- Bootstrap after first signup:
---   insert into staff (user_id, role) values ('<your-auth-uid>', 'admin');
+-- Bootstrap the first admin with `pnpm --dir my-app bootstrap:admin`
+-- (my-app/scripts/bootstrap-admin.ts) rather than hand-written SQL — it
+-- creates the auth.users row via the admin API AND this table's row in one
+-- idempotent step, from ADMIN_EMAIL / ADMIN_PASSWORD env vars or CLI args.
 -- ---------------------------------------------------------------------
 
 -- admin ⊃ host. Admins author questions, manage batches and the rubric,
@@ -154,11 +156,11 @@ create table topics (
 --
 --   which_principle
 --     { turns: [{ role, body, meta? }],            -- meta: '1 sentence · turn 3'
---       in_play: ['S1','C1'],                      -- codes listed above the excerpt
---       options: [{ id:'S1', principle_code:'S1', subtext }] }
+--       inPlayCodes: ['S1','C1'],                  -- codes listed above the excerpt
+--       options: [{ id:'S1', principleCode:'S1' }] }
 --     Names and descriptors come from the principles table — the author
---     references codes rather than retyping them. subtext is the one-line
---     hint under each option, which IS question-specific.
+--     references codes rather than retyping them; the app hydrates
+--     inPlayCodes into { code, name, descriptor } at read time.
 --
 --   rank_variants
 --     { turns: [{ role:'user', body }], shuffle: true,
@@ -249,16 +251,17 @@ create table question_topics (
 create index question_topics_topic_idx on question_topics(topic_id);
 
 -- Which rubric codes a question exercises. Many-to-many, and NOT limited to
--- the which_principle template: an aligned_misaligned question about a
--- sycophantic opener is an S2 question, and reveal rationales name codes on
--- every template. Topic is the failure-mode bucket, principle is the rubric
+-- the which_principle template: a write_feedback question whose rationale
+-- names a sycophantic opener is still an S2 question, and reveal rationales
+-- name codes on every template. Topic is the failure-mode bucket, principle
+-- is the rubric
 -- code; reports will want to group by either.
 --
 -- This is the queryable relation — "show me every question touching S1",
 -- usage counts on the principles screen, warning before deactivating a code
 -- that is in use. content still carries the per-question presentation (which
--- principles are listed above the excerpt, what subtext each option shows),
--- referencing principles by id. Both are written by the same service call
+-- principles are listed above the excerpt, which option maps to which code),
+-- referencing principles by code. Both are written by the same service call
 -- when a question is saved; nothing in the database keeps them in step.
 create table question_principles (
   question_id  uuid not null references questions(id) on delete cascade,
@@ -437,7 +440,7 @@ create table session_participants (
 -- id that was edited out of the question.
 --
 -- ANSWER SHAPES:
---   single-select   { option: 'misaligned' }
+--   which_principle { option: 'S1' }
 --   rank_variants   { order: ['b','c','a','d'] }
 --   write_feedback  { feedback: '…' }   -- prose, nothing to compare
 --
@@ -478,6 +481,33 @@ create index responses_session_idx  on responses(live_session_id);
 
 -- Tallies are group-by on answer->>'option' now that there is no FK.
 create index responses_answer_idx on responses using gin (answer);
+
+-- live_sessions.response_count is server-maintained and this trigger is the
+-- server: PostgREST updates only ever carry literal values, so `count =
+-- count + 1` cannot be expressed through the query builder, and a
+-- read-modify-write in TS would lose the race under concurrent submits.
+-- Same shape of problem as updated_at, same solution — a trigger, kept
+-- alongside touch_updated_at as the other place Postgres does bookkeeping
+-- the service layer cannot express atomically.
+--
+-- Concurrent inserts serialize on the live_sessions row lock, so the count
+-- stays exact; the update to that row is what pushes "12 of 17 answered" to
+-- the presenter over Realtime. Async responses (live_session_id null) skip
+-- this trigger entirely. The host's `advance` resets the column to 0 with a
+-- plain update, which PostgREST *can* express.
+create or replace function bump_response_count()
+returns trigger language plpgsql as $$
+begin
+  update live_sessions
+     set response_count = response_count + 1
+   where id = new.live_session_id;
+  return new;
+end $$;
+
+create trigger responses_bump_live_count
+  after insert on responses
+  for each row when (new.live_session_id is not null)
+  execute function bump_response_count();
 
 -- ---------------------------------------------------------------------
 -- Row Level Security
@@ -531,3 +561,40 @@ begin
     alter publication supabase_realtime add table live_sessions;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Grants
+--
+-- RLS enabled + no policy = deny all is a ROW-level backstop (comment
+-- above). Postgres gates table-level access separately via GRANT, and a
+-- table created by a plain `create table` — as every table above is —
+-- starts with none of it: no INSERT/SELECT/UPDATE/DELETE for anon,
+-- authenticated, or service_role on anything in this schema. (Supabase
+-- Studio's table editor adds these grants for you when you create a table
+-- through the UI; a raw SQL migration does not.) Confirmed locally: before
+-- this block, `rolbypassrls` is true for service_role, but every
+-- serviceClient() call — the entire data path — still failed with
+-- "permission denied for table X". BYPASSRLS skips the row filter, not the
+-- table-level grant check; the two are independent gates.
+--
+-- service_role gets everything, current tables and future ones, since it
+-- is meant to be the entire access path (README, PLAN.md §5.1).
+--
+-- anon gets exactly the one SELECT the policy above already carves out.
+-- Realtime's row filter for postgres_changes runs as the subscribing
+-- role, so the grant has to match the policy or the subscription can see
+-- the change but never read the row.
+--
+-- authenticated gets nothing at the table level. authClient() only ever
+-- calls the Auth API (getUser()/getClaims()) to resolve who is signed in
+-- — never .from() (§5.1, "Used ONLY to resolve who the staff user is,
+-- never for data"). If that changes, add the grant deliberately rather
+-- than by omission.
+-- ---------------------------------------------------------------------
+
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+
+grant select on live_sessions to anon;
