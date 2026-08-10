@@ -42,11 +42,12 @@ export type ResponseInsert = {
 };
 
 /**
- * The one write. `responses_dedupe` (question + participant + session) is
- * what actually wins the double-tap race — app code cannot, and the
- * migration says so. 23505 therefore is not a failure: it is the expected
- * outcome of a refresh, and both submit paths translate it into
- * "already answered" rather than a red box (PLAN §5.8).
+ * The one write. `responses_dedupe` (question + participant + context,
+ * where a context is one async batch or one live session) is what actually
+ * wins the double-tap race — app code cannot, and the migration says so.
+ * 23505 therefore is not a failure: it is the expected outcome of a
+ * refresh, and both submit paths translate it into "already answered"
+ * rather than a red box (PLAN §5.8).
  *
  * `live_sessions.response_count` is bumped by the `responses_bump_live_count`
  * trigger, not from here — PostgREST cannot express `count = count + 1`.
@@ -77,14 +78,16 @@ export async function insert(input: ResponseInsert): Promise<ResponseRow> {
 
 /**
  * The async resume path: which of these questions has this participant
- * already answered?
+ * already answered IN THIS BATCH?
  *
- * Deliberately NOT scoped by batch. `responses_dedupe` is not either — a
- * question answered under a different batch is still answered, and filtering
- * by batch here would show it as unanswered and then fail the insert.
+ * Scoped by batch, matching `responses_dedupe` (re-scoped 2026-08-10): the
+ * same question in another batch is asked afresh there — repetition is
+ * reinforcement, not noise — so an answer given elsewhere neither shows
+ * here nor blocks the insert.
  */
 export async function listAsyncForParticipant(
   participantId: string,
+  batchId: string,
   questionIds: string[],
 ): Promise<ListResult<ResponseRow>> {
   if (questionIds.length === 0) return { rows: [], skipped: [] };
@@ -94,6 +97,7 @@ export async function listAsyncForParticipant(
       .from("responses")
       .select(COLUMNS)
       .eq("participant_id", participantId)
+      .eq("batch_id", batchId)
       .in("question_id", questionIds)
       .is("live_session_id", null),
   );

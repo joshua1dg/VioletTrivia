@@ -75,13 +75,14 @@ export async function submitAsync(
     });
   } catch (error) {
     // `responses_dedupe` in Postgres is what actually wins the double-tap
-    // race — app code cannot. A conflict here is the EXPECTED outcome of a
-    // refresh, so it resolves to the existing answer and its reveal, not to
-    // a red error box (PLAN §5.8).
+    // race — app code cannot. The index is scoped per batch (2026-08-10),
+    // so a conflict here can only mean THIS batch already has this answer:
+    // the EXPECTED outcome of a refresh, resolved to the existing answer
+    // and its reveal, not to a red error box (PLAN §5.8).
     if (!isAppError(error) || error.kind !== "conflict") throw error;
 
     alreadyAnswered = true;
-    response = await findExisting(input.participantId, input.questionId);
+    response = await findExisting(input.participantId, batch.id, input.questionId);
   }
 
   // The key is loaded ONLY here, after the answer is safely recorded.
@@ -89,11 +90,7 @@ export async function submitAsync(
 
   return {
     alreadyAnswered,
-    // `response` came either from the insert above (batchId = this batch,
-    // so `answeredElsewhere` is false) or from `findExisting` on a dedupe
-    // conflict — where the row may belong to a DIFFERENT batch, and the
-    // reveal says so instead of passing the old answer off as a fresh one.
-    reveal: buildReveal(question, response, batch.id),
+    reveal: buildReveal(question, response),
   };
 }
 
@@ -107,16 +104,14 @@ export async function submitAsync(
 export async function listAnsweredReveals(
   participantId: string,
   questionIds: string[],
-  /** The batch whose flow is asking. The lookup itself stays deliberately
-   * UNSCOPED by batch (`responses_dedupe` is too — an answer given under
-   * another batch still exists and a re-submit would only bounce off the
-   * unique index), but each reveal carries `answeredElsewhere` so the flow
-   * can present a foreign answer as "answered earlier" rather than as part
-   * of this batch's own progress. */
+  /** Scopes the lookup: only answers given in THIS batch count. The same
+   * question answered under another batch is asked afresh here —
+   * `responses_dedupe` is per-batch (2026-08-10). */
   batchId: string,
 ): Promise<{ reveals: Reveal[]; skipped: SkippedRow[] }> {
   const answered = await repo.listAsyncForParticipant(
     participantId,
+    batchId,
     questionIds,
   );
   if (answered.rows.length === 0) {
@@ -130,7 +125,7 @@ export async function listAnsweredReveals(
 
   const reveals = answered.rows.flatMap((row) => {
     const question = byId.get(row.questionId);
-    return question ? [buildReveal(question, row, batchId)] : [];
+    return question ? [buildReveal(question, row)] : [];
   });
 
   return {
@@ -139,20 +134,27 @@ export async function listAnsweredReveals(
   };
 }
 
-/** Which of these has been answered — no keys, for a progress indicator. */
+/** Which of these has been answered in this batch — no keys, for a progress
+ * indicator. */
 export async function listAnsweredQuestionIds(
   participantId: string,
+  batchId: string,
   questionIds: string[],
 ): Promise<string[]> {
   const answered = await repo.listAsyncForParticipant(
     participantId,
+    batchId,
     questionIds,
   );
   return answered.rows.map((row) => row.questionId);
 }
 
-async function findExisting(participantId: string, questionId: string) {
-  const existing = await repo.listAsyncForParticipant(participantId, [
+async function findExisting(
+  participantId: string,
+  batchId: string,
+  questionId: string,
+) {
+  const existing = await repo.listAsyncForParticipant(participantId, batchId, [
     questionId,
   ]);
   const row = existing.rows[0];

@@ -4,10 +4,12 @@ import type { ReportResponseRow } from "@/lib/repos/reports";
  * Pure — no client, no io (PLAN §8's rule for this folder).
  *
  * One person can legitimately answer the same question more than once: once
- * async, and once per live session run off the batch (`responses_dedupe` is
- * per-channel, not per-question-per-person). For calibration those repeats
- * must not stack — and the FIRST answer is the honest signal, since any
- * later one may come after seeing the reveal.
+ * per async batch, and once per live session run off the batch
+ * (`responses_dedupe` is per-context, not per-question-per-person). Within
+ * ONE batch's report those repeats must not stack — and the FIRST answer is
+ * the honest signal, since any later one may come after seeing the reveal.
+ * Repeats across different batches are each their own batch's signal and
+ * never meet in one report.
  *
  * Rows are expected oldest-first (the repo orders by `created_at`), but this
  * sorts defensively rather than trusting the caller.
