@@ -2,6 +2,19 @@ import type { Turn } from "@/lib/templates/types";
 import { AddButton, Field, ItemCard, TextArea, TextInput } from "./form";
 
 /**
+ * Selected role reads as a SOLID chip, matching what `components/question/
+ * excerpt.tsx` renders to the reviewer — so the toggle previews the turn's
+ * eventual colour instead of just recording a choice.
+ *
+ * The old selected-user state was `bg-surface text-muted`, which was the same
+ * treatment as an unselected button on hover: nothing said which one was on.
+ */
+const SELECTED_ROLE: Record<Turn["role"], string> = {
+  user: "border-muted bg-muted text-white",
+  assistant: "border-violet bg-violet text-white",
+};
+
+/**
  * Shared because every template's content has `turns` — the conversation
  * being judged. It lives in the editor rather than in any Author form for
  * the same reason the Why note lives in the flow: it isn't template-specific.
@@ -32,10 +45,8 @@ export function TurnsEditor({
                   onClick={() => patch(i, { role })}
                   className={`cursor-pointer rounded border px-2 py-0.5 font-mono text-[10.5px] tracking-[0.08em] uppercase transition-colors ${
                     turn.role === role
-                      ? role === "assistant"
-                        ? "border-violet-line bg-violet-tint text-violet-ink"
-                        : "border-line bg-surface text-muted"
-                      : "border-line text-faint hover:bg-surface"
+                      ? SELECTED_ROLE[role]
+                      : "border-line text-faint hover:bg-surface hover:text-muted-2"
                   }`}
                 >
                   {role}
