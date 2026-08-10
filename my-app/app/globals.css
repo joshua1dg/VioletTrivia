@@ -11,7 +11,15 @@
   --color-violet-deep: #3f1fd6;
   --color-violet-tint: #f7f5ff;
   --color-violet-tint-2: #f4f2ff;
+  /* A tint with enough body to read as a filled CARD on a white surface,
+     where -tint/-tint-2 read as a wash. Sized against readability, not
+     looks: ink-3 on it is 11.9:1 and violet-ink is 5.4:1, both comfortable
+     for long transcripts and for a projected screen. */
+  --color-violet-tint-3: #ebe7ff;
   --color-violet-line: #dfdaff;
+  /* -line disappears against -tint-3 (1.1:1). This is the edge to use when
+     the violet fill is underneath. */
+  --color-violet-line-2: #cec6ff;
 
   --color-ok: #059669;
   --color-ok-ink: #047857;
