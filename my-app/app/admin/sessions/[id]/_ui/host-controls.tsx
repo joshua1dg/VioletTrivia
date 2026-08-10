@@ -260,6 +260,29 @@ export function HostControlsBar({
       ? totalQuestions > 0
       : currentPosition + 1 < totalQuestions;
 
+  // Nothing left to run. The four phase controls all become wrong here rather
+  // than merely useless: `advance` throws past the last question, and lock /
+  // reveal / lobby would walk the room BACKWARDS out of the state it just
+  // finished in. Ending is the only move, so it's the only button.
+  //
+  // Reached three ways: the room is already over, the batch has no questions
+  // to run at all, or the last question has been revealed. Note it is the
+  // REVEAL that finishes a room, not arriving at the last question — the
+  // final question still needs its lock and its reveal like any other.
+  const ended = live.phase === "ended";
+  const finished =
+    ended || totalQuestions === 0 || (!hasNext && live.phase === "revealed");
+
+  // No footnote once the room is over: the status line above already reads
+  // "Ended", and the presenter is showing the room a full-screen version of
+  // the same thing.
+  let footnote: string | null = null;
+  if (ended) footnote = null;
+  else if (totalQuestions === 0) footnote = "This batch has no questions.";
+  else if (finished)
+    footnote = "That was the last question — all that's left is to end the session.";
+  else if (!hasNext) footnote = "This is the last question in the batch.";
+
   return (
     <div className={t.root}>
       <div className={t.statusBox}>
@@ -323,69 +346,74 @@ export function HostControlsBar({
 
       <HostError tone={tone} error={error} />
 
-      <div className="flex flex-wrap items-center gap-2.5">
-        <HostButton
-          tone={tone}
-          pending={pending}
-          onClick={() => run(() => advance(sessionId))}
-        >
-          {currentPosition === null ? "Start" : "Next question"}
-        </HostButton>
-        <HostButton
-          tone={tone}
-          variant="ghost"
-          pending={pending}
-          onClick={() => run(() => setPhase(sessionId, "locked"))}
-        >
-          Lock answers
-        </HostButton>
-        <HostButton
-          tone={tone}
-          variant="ghost"
-          pending={pending}
-          onClick={() => run(() => setPhase(sessionId, "revealed"))}
-        >
-          Reveal
-        </HostButton>
-        <HostButton
-          tone={tone}
-          variant="ghost"
-          pending={pending}
-          onClick={() => run(() => setPhase(sessionId, "lobby"))}
-        >
-          Back to lobby
-        </HostButton>
+      {/* An ended room has no controls at all — not even End session, which
+          it has already been through. */}
+      {!ended && (
+        <div className="flex flex-wrap items-center gap-2.5">
+          {!finished && (
+            <>
+              <HostButton
+                tone={tone}
+                pending={pending}
+                onClick={() => run(() => advance(sessionId))}
+              >
+                {currentPosition === null ? "Start" : "Next question"}
+              </HostButton>
+              <HostButton
+                tone={tone}
+                variant="ghost"
+                pending={pending}
+                onClick={() => run(() => setPhase(sessionId, "locked"))}
+              >
+                Lock answers
+              </HostButton>
+              <HostButton
+                tone={tone}
+                variant="ghost"
+                pending={pending}
+                onClick={() => run(() => setPhase(sessionId, "revealed"))}
+              >
+                Reveal
+              </HostButton>
+              <HostButton
+                tone={tone}
+                variant="ghost"
+                pending={pending}
+                onClick={() => run(() => setPhase(sessionId, "lobby"))}
+              >
+                Back to lobby
+              </HostButton>
+            </>
+          )}
 
-        <div className="ml-auto">
-          <EndSessionControl
-            tone={tone}
-            onError={setError}
-            onConfirm={async () => {
-              const result = await endSession(sessionId);
-              if (!result.ok) return { ok: false, message: result.message };
-              // The host page has nothing left to show once the room is
-              // over, so it goes back to the list. The presenter does — it
-              // stays put and renders its own "Session ended." to the room,
-              // which is the last thing the audience should see. Sending a
-              // projector to the admin sessions list would be worse than
-              // doing nothing.
-              if (tone === "light") router.push("/admin/sessions");
-              return { ok: true };
-            }}
-          />
+          {/* `ml-auto` even when it stands alone, so the button doesn't jump
+              across the bar the moment the last question is revealed. */}
+          <div className="ml-auto">
+            <EndSessionControl
+              tone={tone}
+              onError={setError}
+              onConfirm={async () => {
+                const result = await endSession(sessionId);
+                if (!result.ok) return { ok: false, message: result.message };
+                // The host page has nothing left to show once the room is
+                // over, so it goes back to the list. The presenter does — it
+                // stays put and renders its own "Session ended." to the room,
+                // which is the last thing the audience should see. Sending a
+                // projector to the admin sessions list would be worse than
+                // doing nothing.
+                if (tone === "light") router.push("/admin/sessions");
+                return { ok: true };
+              }}
+            />
+          </div>
         </div>
-      </div>
-
-      {/* `live.phase`, not the server-rendered one: it is seeded from the same
-          value and is strictly fresher, so the footnote disappears the moment
-          the room ends rather than at the next render of the host page. */}
-      {!hasNext && live.phase !== "ended" && (
-        <p className={t.footnote}>
-          {currentPosition === null
-            ? "This batch has no questions."
-            : "This is the last question in the batch."}
-        </p>
       )}
+
+      {/* Driven by `live.phase`, not the server-rendered one: it is seeded
+          from the same value and is strictly fresher, so this tracks the room
+          the moment a phase is pushed rather than at the next render of the
+          host page. */}
+      {footnote && <p className={t.footnote}>{footnote}</p>}
     </div>
   );
 }
