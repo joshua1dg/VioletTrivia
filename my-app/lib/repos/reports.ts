@@ -62,7 +62,7 @@ export async function listBatchesWithResponseCounts(): Promise<
     unwrap(
       await serviceClient()
         .from("responses")
-        .select("id, batch_id, live_session_id"),
+        .select("id, batch_id, live_session_id, participant_id, question_id"),
     ),
   ]);
 
@@ -70,23 +70,25 @@ export async function listBatchesWithResponseCounts(): Promise<
     sessionRows.map((session) => [session.id, session.batch_id]),
   );
 
-  // batchId -> the set of response ids counted toward it. A Set rather than
-  // a running total so a response that somehow matched both an async and a
-  // live path (the schema shouldn't produce one, but a merge must never
-  // double-count regardless) is only ever counted once.
-  const responseIdsByBatch = new Map<string, Set<string>>();
+  // batchId -> distinct (participant, question) pairs. Counting PAIRS, not
+  // response rows, keeps this screen's number consistent with the detail
+  // report, which dedupes one person's repeat answers to the same question
+  // (async + several live sessions are all legitimate separate rows) down
+  // to their first.
+  const answerPairsByBatch = new Map<string, Set<string>>();
 
-  const credit = (batchId: string | null, responseId: string) => {
+  const credit = (batchId: string | null, pair: string) => {
     if (!batchId) return;
-    const set = responseIdsByBatch.get(batchId) ?? new Set<string>();
-    set.add(responseId);
-    responseIdsByBatch.set(batchId, set);
+    const set = answerPairsByBatch.get(batchId) ?? new Set<string>();
+    set.add(pair);
+    answerPairsByBatch.set(batchId, set);
   };
 
   for (const response of responseRows) {
-    credit(response.batch_id, response.id); // async
+    const pair = `${response.participant_id}:${response.question_id}`;
+    credit(response.batch_id, pair); // async
     if (response.live_session_id) {
-      credit(batchIdBySession.get(response.live_session_id) ?? null, response.id); // live
+      credit(batchIdBySession.get(response.live_session_id) ?? null, pair); // live
     }
   }
 
@@ -94,7 +96,7 @@ export async function listBatchesWithResponseCounts(): Promise<
     id: row.id,
     name: row.name,
     status: row.status,
-    responseCount: responseIdsByBatch.get(row.id)?.size ?? 0,
+    responseCount: answerPairsByBatch.get(row.id)?.size ?? 0,
   }));
 }
 
@@ -127,9 +129,10 @@ export type ReportResponseRow = {
   questionId: string;
   participantId: string;
   answer: Answer;
+  createdAt: string;
 };
 
-const RESPONSE_COLUMNS = "id, question_id, participant_id, answer";
+const RESPONSE_COLUMNS = "id, question_id, participant_id, answer, created_at";
 
 /**
  * Every response recorded against this batch, async AND live: `batch_id =
@@ -148,7 +151,13 @@ export async function listResponsesForBatch(
 ): Promise<ListResult<ReportResponseRow>> {
   const sessionIds = await listLiveSessionIdsForBatch(batchId);
 
-  const query = serviceClient().from("responses").select(RESPONSE_COLUMNS);
+  // Oldest first: the service dedupes repeat answers (same participant, same
+  // question, across channels/sessions) down to the FIRST one, so the order
+  // here is what makes "first" mean first.
+  const query = serviceClient()
+    .from("responses")
+    .select(RESPONSE_COLUMNS)
+    .order("created_at", { ascending: true });
 
   const rows = unwrap(
     await (sessionIds.length > 0
@@ -177,6 +186,7 @@ function mapResponse(row: {
   question_id: string;
   participant_id: string;
   answer: unknown;
+  created_at: string;
 }): ReportResponseRow {
   return {
     id: row.id,
@@ -186,6 +196,7 @@ function mapResponse(row: {
       id: row.id,
       column: "answer",
     }),
+    createdAt: row.created_at,
   };
 }
 

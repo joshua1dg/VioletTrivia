@@ -7,6 +7,7 @@ import * as batchesService from "@/lib/services/batches";
 import type { BatchStatus } from "@/lib/services/batches";
 import * as questionsService from "@/lib/services/questions";
 
+import { dedupeToFirstAnswer } from "./dedupe.util";
 import { buildExclusions, type ExcludedQuestion } from "./exclusion.util";
 import { gradeResponses } from "./grade.util";
 import { buildRubricRows, type RubricRow } from "./rubric.util";
@@ -52,6 +53,9 @@ export type BatchReport = {
   topics: TopicRow[];
   excluded: ExcludedQuestion[];
   skipped: SkippedRow[];
+  /** Repeat answers (same person, same question — e.g. async + a live
+   *  session) dropped before grading; only the first counted. */
+  duplicateCount: number;
 };
 
 /**
@@ -80,9 +84,15 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
     questionsResult.rows.map((question) => [question.id, question]),
   );
 
-  const graded = gradeResponses(responses.rows, questionsById);
+  // One row per (participant, question) before grading — the first answer
+  // is the calibration signal; repeats (async + live sessions) must not
+  // stack the bars. `duplicateCount` is surfaced so the screen can say why
+  // its denominators differ from the raw response total.
+  const firstAnswers = dedupeToFirstAnswer(responses.rows);
+
+  const graded = gradeResponses(firstAnswers.rows, questionsById);
   const participantCount = new Set(
-    responses.rows.map((response) => response.participantId),
+    firstAnswers.rows.map((response) => response.participantId),
   ).size;
 
   return {
@@ -93,5 +103,6 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
     topics: buildTopicRows(graded, topicLinks),
     excluded: buildExclusions(questionsResult.rows, responses.rows),
     skipped: mergeSkipped(responses, questionsResult),
+    duplicateCount: firstAnswers.duplicateCount,
   };
 }

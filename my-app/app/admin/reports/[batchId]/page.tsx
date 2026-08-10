@@ -43,6 +43,15 @@ export default async function BatchReportPage({
       <div className="flex flex-col gap-6 p-6">
         <SkippedRowsBanner skipped={report.skipped} />
 
+        {report.duplicateCount > 0 && (
+          <p className="text-[12.5px] text-muted-3">
+            {report.duplicateCount} repeat answer
+            {report.duplicateCount === 1 ? "" : "s"} excluded — when the same
+            person answers the same question more than once (async and live,
+            or across sessions), only their first answer counts.
+          </p>
+        )}
+
         <Section title="By rubric code">
           {report.rubric.length === 0 ? (
             <p className="text-[13px] text-muted-3">
