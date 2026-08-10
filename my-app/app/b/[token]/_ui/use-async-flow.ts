@@ -46,12 +46,23 @@ export function useAsyncFlow(opts: {
   const firstUnansweredIndex = steps.findIndex(
     (step) => step.kind === "question" && !reveals[step.question.id],
   );
-  const hasAnsweredAny = steps.some((step) => step.kind === "reveal");
+  // Only answers given IN THIS BATCH count as having started it. A reveal
+  // with `answeredElsewhere` is the same question answered under a DIFFERENT
+  // batch (the dedupe index is deliberately cross-batch) — it must not skip
+  // a first-time visitor past the intro, and it must not flip a fresh batch
+  // straight to "complete" (the 2026-08-10 bug: a two-question set where one
+  // question was shared with an earlier batch declared itself done after
+  // one answer).
+  const hasAnsweredAny = steps.some(
+    (step) => step.kind === "reveal" && !step.reveal.answeredElsewhere,
+  );
   const allAnswered = firstUnansweredIndex === -1;
 
   // Resume on refresh (PLAN §5.14/§9): someone who has already started lands
   // straight back in the sequence at their first unanswered question, rather
-  // than re-clicking through an intro screen they've already seen.
+  // than re-clicking through an intro screen they've already seen. A
+  // first-time visitor starts at 0 even when an "answered earlier" reveal
+  // sits mid-sequence, so nothing is silently skipped over.
   const [screen, setScreen] = useState<FlowScreen>(() => {
     // An empty draw (`async_sample_size` of 0, or a batch composed with no
     // questions yet) has nothing to start or resume.
@@ -59,7 +70,9 @@ export function useAsyncFlow(opts: {
     if (allAnswered) return hasAnsweredAny ? "complete" : "intro";
     return hasAnsweredAny ? "sequence" : "intro";
   });
-  const [index, setIndex] = useState(() => Math.max(firstUnansweredIndex, 0));
+  const [index, setIndex] = useState(() =>
+    hasAnsweredAny ? Math.max(firstUnansweredIndex, 0) : 0,
+  );
 
   const [answer, setAnswer] = useState<Answer>({});
   const [rationale, setRationale] = useState("");

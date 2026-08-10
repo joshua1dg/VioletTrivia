@@ -55,7 +55,7 @@ export default async function AsyncBatchPage({
   // the batch has gone inactive (responses.service.ts). Everything else is
   // read via `listForReviewer`, which never selects `answer_key` (rule 8).
   const [answered, unanswered] = await Promise.all([
-    listAnsweredReveals(participantId, draw),
+    listAnsweredReveals(participantId, draw, access.id),
     listForReviewer(draw),
   ]);
 

@@ -116,11 +116,17 @@ export function QuestionStep({
       <QuestionShell
         label={label}
         progress={progress}
-        status="Answer"
-        statusTone="ok"
+        status={reveal.answeredElsewhere ? "Answered earlier" : "Answer"}
+        statusTone={reveal.answeredElsewhere ? "muted" : "ok"}
         action={nextAction}
       >
         <div className="flex flex-col gap-5">
+          {reveal.answeredElsewhere && (
+            <p className="rounded-[9px] border border-line bg-surface px-4 py-3 text-[13px] leading-[1.6] text-muted-2">
+              You already answered this one in another set, so it isn&rsquo;t
+              asked again — here&rsquo;s the answer you gave then.
+            </p>
+          )}
           <RevealComponent
             content={reveal.content}
             answerKey={reveal.answerKey}

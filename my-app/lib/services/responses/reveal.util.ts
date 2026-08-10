@@ -27,6 +27,17 @@ export type Reveal = {
     /** Their optional "Why?" note. */
     rationale: string | null;
     /**
+     * True when the answer on file was given OUTSIDE the batch being viewed
+     * — the same question in a different async batch. `responses_dedupe` is
+     * deliberately not scoped by batch (migration ~line 483: "a participant
+     * still answers it once, so tallies stay clean"), so a shared question
+     * arrives in the second batch already answered. The flow renders those
+     * as "answered earlier" rather than passing them off as a fresh answer —
+     * without this flag a participant who never saw the question in THIS
+     * set gets an unexplained answer page (the bug of 2026-08-10).
+     */
+    answeredElsewhere: boolean;
+    /**
      * 0, 1, or NULL where the template has no gradeable answer.
      * `write_feedback` is prose — anything that scores must skip it rather
      * than quietly count every response as wrong.
@@ -38,7 +49,15 @@ export type Reveal = {
 
 export function buildReveal(
   question: AuthoredQuestion,
-  response: { answer: Answer; rationale: string | null; createdAt: string },
+  response: {
+    answer: Answer;
+    rationale: string | null;
+    createdAt: string;
+    batchId: string | null;
+  },
+  /** The batch the participant is currently viewing — `answeredElsewhere`
+   * is "this response belongs to some other batch than that one". */
+  viewedBatchId: string,
 ): Reveal {
   return {
     questionId: question.id,
@@ -48,6 +67,7 @@ export function buildReveal(
     answerKey: question.answerKey,
     answer: response.answer,
     rationale: response.rationale,
+    answeredElsewhere: response.batchId !== viewedBatchId,
     grade: gradeFor(question.template, response.answer, question.answerKey),
     answeredAt: response.createdAt,
     // One cast, where a runtime `template` string meets the static union —

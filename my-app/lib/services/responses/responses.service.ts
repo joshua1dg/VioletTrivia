@@ -89,7 +89,11 @@ export async function submitAsync(
 
   return {
     alreadyAnswered,
-    reveal: buildReveal(question, response),
+    // `response` came either from the insert above (batchId = this batch,
+    // so `answeredElsewhere` is false) or from `findExisting` on a dedupe
+    // conflict — where the row may belong to a DIFFERENT batch, and the
+    // reveal says so instead of passing the old answer off as a fresh one.
+    reveal: buildReveal(question, response, batch.id),
   };
 }
 
@@ -103,6 +107,13 @@ export async function submitAsync(
 export async function listAnsweredReveals(
   participantId: string,
   questionIds: string[],
+  /** The batch whose flow is asking. The lookup itself stays deliberately
+   * UNSCOPED by batch (`responses_dedupe` is too — an answer given under
+   * another batch still exists and a re-submit would only bounce off the
+   * unique index), but each reveal carries `answeredElsewhere` so the flow
+   * can present a foreign answer as "answered earlier" rather than as part
+   * of this batch's own progress. */
+  batchId: string,
 ): Promise<{ reveals: Reveal[]; skipped: SkippedRow[] }> {
   const answered = await repo.listAsyncForParticipant(
     participantId,
@@ -119,7 +130,7 @@ export async function listAnsweredReveals(
 
   const reveals = answered.rows.flatMap((row) => {
     const question = byId.get(row.questionId);
-    return question ? [buildReveal(question, row)] : [];
+    return question ? [buildReveal(question, row, batchId)] : [];
   });
 
   return {
