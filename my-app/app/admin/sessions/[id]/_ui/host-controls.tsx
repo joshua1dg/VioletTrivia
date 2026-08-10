@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ConfirmDelete, ErrorNote, SubmitButton, type ErrorLike } from "@/components/feedback";
 import { formatRoomNumber } from "@/lib/realtime/room-number";
 import { useSessionChannel } from "@/lib/realtime/session-channel";
+import { formatSeconds, useCountdown } from "@/lib/realtime/use-countdown";
 import type { SessionPhase } from "@/lib/services/sessions";
 
 import { advance, endSession, setPhase, type ActionError } from "../../actions";
@@ -15,6 +16,7 @@ type CurrentState = {
   currentQuestionId: string | null;
   currentPosition: number | null;
   responseCount: number;
+  votingEndsAt: string | null;
 };
 
 type QuestionSummary = { prompt: string; templateLabel: string };
@@ -57,10 +59,22 @@ export function HostControls({
     phase: current.phase,
     currentQuestionId: current.currentQuestionId,
     responseCount: current.responseCount,
+    votingEndsAt: current.votingEndsAt,
   });
 
   const [error, setError] = useState<ErrorLike | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Timed sessions: count down toward the Realtime-pushed deadline, and at
+  // zero flip the phase to LOCKED (never revealed — revealing stays a human
+  // act). The server's submit guard is what actually enforces the cutoff;
+  // this just makes the room's state say what is already true. Keyed by the
+  // deadline value so it fires once per voting window, and re-opening
+  // voting (a fresh deadline) arms it again.
+  const secondsLeft = useCountdown(
+    live.phase === "voting" ? live.votingEndsAt : null,
+  );
+  const autoLockedFor = useRef<string | null>(null);
 
   const lastQuestionId = useRef(current.currentQuestionId);
   useEffect(() => {
@@ -69,6 +83,17 @@ export function HostControls({
       router.refresh();
     }
   }, [live.currentQuestionId, router]);
+
+  useEffect(() => {
+    if (live.phase !== "voting" || secondsLeft !== 0 || !live.votingEndsAt)
+      return;
+    if (autoLockedFor.current === live.votingEndsAt) return;
+    autoLockedFor.current = live.votingEndsAt;
+    startTransition(async () => {
+      const result = await setPhase(sessionId, "locked");
+      if (!result.ok) setError(result.message);
+    });
+  }, [secondsLeft, live.phase, live.votingEndsAt, sessionId, startTransition]);
 
   function run(action: () => Promise<{ ok: true } | ActionError>) {
     setError(null);
@@ -93,6 +118,17 @@ export function HostControls({
         <div className="flex flex-col gap-1">
           <span className="text-[13px] font-medium text-ink">
             {formatRoomNumber(roomNumber)} · {PHASE_LABEL[live.phase]}
+            {live.phase === "voting" && secondsLeft !== null && (
+              <span
+                className={
+                  secondsLeft <= 10
+                    ? "ml-2 font-semibold tabular-nums text-warn-ink"
+                    : "ml-2 tabular-nums text-muted-2"
+                }
+              >
+                {formatSeconds(secondsLeft)}
+              </span>
+            )}
           </span>
           <span className="text-[12.5px] text-muted-3">
             {position}

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { asAppError } from "@/lib/errors";
 import * as sessions from "@/lib/services/sessions";
@@ -23,11 +24,22 @@ import type { SessionPhase } from "@/lib/services/sessions";
 
 export type ActionError = { ok: false; message: string };
 
+const votingSecondsInput = z
+  .number()
+  .int()
+  .min(5, "A timer shorter than 5 seconds isn't answerable.")
+  .max(3600, "Timers cap at an hour.")
+  .nullable();
+
 export async function startSession(
   batchId: string,
+  votingSeconds: number | null = null,
 ): Promise<{ ok: true; sessionId: string; roomNumber: number } | ActionError> {
   try {
-    const result = await sessions.startSession(batchId);
+    const result = await sessions.startSession(
+      batchId,
+      votingSecondsInput.parse(votingSeconds),
+    );
     revalidatePath("/admin/sessions");
     return { ok: true, ...result };
   } catch (error) {

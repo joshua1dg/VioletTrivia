@@ -395,6 +395,17 @@ create table live_sessions (
   -- what the table is still good for.
   response_count      int not null default 0,
 
+  -- Optional per-question timer, chosen once when the session starts.
+  -- Null = untimed session.
+  voting_seconds      int check (voting_seconds is null or voting_seconds > 0),
+  -- Deadline for the CURRENT question: stamped (now + voting_seconds)
+  -- whenever the phase enters 'voting' on a timed session, nulled otherwise.
+  -- Clients render their countdown from this via the same Realtime row push
+  -- as everything else; the submit guard rejects answers past it; the
+  -- host's screen flips the phase to 'locked' when it expires (lock, never
+  -- reveal — revealing stays a human act).
+  voting_ends_at      timestamptz,
+
   started_at          timestamptz,
   ended_at            timestamptz,
 

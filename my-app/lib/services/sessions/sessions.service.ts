@@ -30,6 +30,8 @@ export type { BatchWithCounts as StartableBatch };
 
 export async function startSession(
   batchId: string,
+  /** Optional per-question timer; null/undefined = untimed. */
+  votingSeconds?: number | null,
 ): Promise<{ sessionId: string; roomNumber: number }> {
   const staff = await requireStaff();
 
@@ -49,8 +51,19 @@ export async function startSession(
   // as AppError("conflict") from the repo with a message pointing at
   // force-end (PLAN §9's "enforce ... starting while one is open → AppError
   // conflict with a message pointing at force-end").
-  const session = await repo.insert({ batchId, hostId: staff.userId });
+  const session = await repo.insert({
+    batchId,
+    hostId: staff.userId,
+    votingSeconds: votingSeconds ?? null,
+  });
   return { sessionId: session.id, roomNumber: session.roomNumber };
+}
+
+/** now + the session's timer, or null on an untimed session. */
+function votingDeadline(votingSeconds: number | null): string | null {
+  return votingSeconds
+    ? new Date(Date.now() + votingSeconds * 1000).toISOString()
+    : null;
 }
 
 /** Next question in the batch's `position` order; phase → voting;
@@ -75,17 +88,27 @@ export async function advance(sessionId: string): Promise<LiveSessionRow> {
     currentPosition: nextPosition,
     phase: "voting",
     responseCount: 0,
+    votingEndsAt: votingDeadline(session.votingSeconds),
   });
 }
 
 /** lobby | voting | locked | revealed. `ended` goes through `endSession`
- * instead, since ending also stamps `ended_at`. */
+ * instead, since ending also stamps `ended_at`.
+ *
+ * Re-entering `voting` restarts the timer (a fresh deadline from the
+ * session's `voting_seconds`); every other phase clears it, so no screen is
+ * ever counting down toward a phase that already changed. */
 export async function setPhase(
   sessionId: string,
   phase: Exclude<SessionPhase, "ended">,
 ): Promise<LiveSessionRow> {
   await requireStaff();
-  return repo.update(sessionId, { phase });
+  const session = await repo.getById(sessionId);
+  return repo.update(sessionId, {
+    phase,
+    votingEndsAt:
+      phase === "voting" ? votingDeadline(session.votingSeconds) : null,
+  });
 }
 
 export async function endSession(sessionId: string): Promise<void> {
@@ -198,6 +221,7 @@ export type RoomView = {
   sessionId: string;
   phase: SessionPhase;
   currentQuestionId: string | null;
+  votingEndsAt: string | null;
 };
 
 /**
@@ -231,6 +255,7 @@ export async function resolveRoom(input: {
     sessionId: session.id,
     phase: session.phase,
     currentQuestionId: session.currentQuestionId,
+    votingEndsAt: session.votingEndsAt,
   };
 }
 
@@ -250,9 +275,12 @@ export async function roomIsOpen(roomNumber: number): Promise<boolean> {
  * The one read `app/live/actions.ts`'s `submitLiveAnswer` needs before it
  * writes: the registry state machine doesn't stop a submit by itself
  * (`responses.submitLive` has no notion of phase), so this is the guard
- * that keeps a phone from voting once the room has moved past `voting`.
+ * that keeps a phone from voting once the room has moved past `voting` —
+ * or, on a timed session, past the `voting_ends_at` deadline.
  */
-export function getPhase(sessionId: string): Promise<SessionPhase> {
+export function getPhase(
+  sessionId: string,
+): Promise<{ phase: SessionPhase; votingEndsAt: string | null }> {
   return repo.getPhase(sessionId);
 }
 

@@ -81,6 +81,7 @@ export default async function LivePhonePage({
         // Not returned by `resolveRoom`, and the phone never displays it —
         // the Realtime overlay corrects this the moment anything changes.
         responseCount: 0,
+        votingEndsAt: view.votingEndsAt,
       }}
       question={question}
       alreadyAnswered={alreadyAnswered}

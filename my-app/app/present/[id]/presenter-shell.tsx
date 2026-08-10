@@ -9,6 +9,7 @@ import {
   useSessionChannel,
   type SessionChannelInit,
 } from "@/lib/realtime/session-channel";
+import { formatSeconds, useCountdown } from "@/lib/realtime/use-countdown";
 import type { ReviewerQuestion } from "@/lib/services/questions";
 import type { PresenterTally } from "@/lib/services/sessions";
 import { registry } from "@/lib/templates/registry";
@@ -53,6 +54,9 @@ export function PresenterShell({
 }) {
   const router = useRouter();
   const live = useSessionChannel(sessionId, initial);
+  const secondsLeft = useCountdown(
+    live.phase === "voting" ? live.votingEndsAt : null,
+  );
 
   const prev = useRef({ q: initial.currentQuestionId, phase: initial.phase });
   useEffect(() => {
@@ -86,6 +90,17 @@ export function PresenterShell({
             {initial.currentPosition !== null &&
               ` · Question ${initial.currentPosition + 1} of ${totalQuestions}`}
           </span>
+          {secondsLeft !== null && (
+            <span
+              className={
+                secondsLeft <= 10
+                  ? "text-[26px] font-semibold tabular-nums text-white"
+                  : "text-[26px] font-semibold tabular-nums text-white/70"
+              }
+            >
+              {formatSeconds(secondsLeft)}
+            </span>
+          )}
         </div>
       </header>
 

@@ -121,6 +121,8 @@ export type Database = {
           response_count: number
           room_number: number
           started_at: string | null
+          voting_ends_at: string | null
+          voting_seconds: number | null
         }
         Insert: {
           batch_id: string
@@ -133,6 +135,8 @@ export type Database = {
           response_count?: number
           room_number?: number
           started_at?: string | null
+          voting_ends_at?: string | null
+          voting_seconds?: number | null
         }
         Update: {
           batch_id?: string
@@ -145,6 +149,8 @@ export type Database = {
           response_count?: number
           room_number?: number
           started_at?: string | null
+          voting_ends_at?: string | null
+          voting_seconds?: number | null
         }
         Relationships: [
           {

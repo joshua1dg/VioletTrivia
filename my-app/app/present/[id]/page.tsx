@@ -57,6 +57,7 @@ export default async function PresentPage({
         currentQuestionId: session.currentQuestionId,
         currentPosition: session.currentPosition,
         responseCount: session.responseCount,
+        votingEndsAt: session.votingEndsAt,
       }}
       question={question}
       tally={tally}

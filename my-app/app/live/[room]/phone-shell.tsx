@@ -9,6 +9,7 @@ import { QuestionShell } from "@/components/question/shell";
 import { WhyNote } from "@/components/question/why-note";
 import type { ReviewerQuestion } from "@/lib/services/questions";
 import { useSessionChannel, type SessionChannelInit } from "@/lib/realtime/session-channel";
+import { formatSeconds, useCountdown } from "@/lib/realtime/use-countdown";
 import { registry } from "@/lib/templates/registry";
 import type { Answer } from "@/lib/templates/types";
 
@@ -59,6 +60,13 @@ export function PhoneShell({
   const [answered, setAnswered] = useState(alreadyAnswered);
   const [error, setError] = useState<ErrorLike | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Display only — the server's submit guard is what enforces the deadline
+  // (`app/live/actions.ts`), so a skewed phone clock mis-renders the number
+  // at worst. The host's screen locks the room when time runs out.
+  const secondsLeft = useCountdown(
+    live.phase === "voting" ? live.votingEndsAt : null,
+  );
 
   // A freshly loaded question (new id) always starts from a clean slate,
   // even though this whole component stays mounted across the refresh.
@@ -144,6 +152,17 @@ export function PhoneShell({
           onClick: onSubmit,
         }}
       >
+        {secondsLeft !== null && (
+          <p
+            className={
+              secondsLeft <= 10
+                ? "text-center text-[13px] font-semibold tabular-nums text-warn-ink"
+                : "text-center text-[13px] tabular-nums text-muted-2"
+            }
+          >
+            {formatSeconds(secondsLeft)} left
+          </p>
+        )}
         <ErrorNote error={error} />
         <ReviewForCurrent
           current={current}

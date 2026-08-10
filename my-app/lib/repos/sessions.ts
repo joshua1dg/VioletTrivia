@@ -27,12 +27,14 @@ export type LiveSessionRow = {
   phase: SessionPhase;
   hostId: string | null;
   responseCount: number;
+  votingSeconds: number | null;
+  votingEndsAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
 };
 
 const COLUMNS =
-  "id, batch_id, room_number, current_question_id, current_position, phase, host_id, response_count, started_at, ended_at";
+  "id, batch_id, room_number, current_question_id, current_position, phase, host_id, response_count, voting_seconds, voting_ends_at, started_at, ended_at";
 
 const CONFLICT_MESSAGE =
   "You already have an open session — force-end it before starting another.";
@@ -40,6 +42,7 @@ const CONFLICT_MESSAGE =
 export async function insert(input: {
   batchId: string;
   hostId: string;
+  votingSeconds: number | null;
 }): Promise<LiveSessionRow> {
   const row = unwrap(
     await serviceClient()
@@ -48,6 +51,7 @@ export async function insert(input: {
         batch_id: input.batchId,
         host_id: input.hostId,
         phase: "lobby",
+        voting_seconds: input.votingSeconds,
         started_at: new Date().toISOString(),
       })
       .select(COLUMNS)
@@ -73,17 +77,19 @@ export async function getById(id: string): Promise<LiveSessionRow> {
 }
 
 /** Only used by the live submit-guard (`app/live/actions.ts`) — cheap enough
- * to select just the one column rather than the whole row. */
-export async function getPhase(id: string): Promise<SessionPhase> {
+ * to select just the two columns the guard reads rather than the whole row. */
+export async function getPhase(
+  id: string,
+): Promise<{ phase: SessionPhase; votingEndsAt: string | null }> {
   const row = unwrap(
     await serviceClient()
       .from("live_sessions")
-      .select("phase")
+      .select("phase, voting_ends_at")
       .eq("id", id)
       .single(),
     { notFound: "That session no longer exists." },
   );
-  return row.phase;
+  return { phase: row.phase, votingEndsAt: row.voting_ends_at };
 }
 
 /** `/join` and `/live/[room]`. Open sessions only — a room number that
@@ -135,6 +141,7 @@ export type LiveSessionPatch = {
   currentQuestionId?: string | null;
   currentPosition?: number | null;
   responseCount?: number;
+  votingEndsAt?: string | null;
   startedAt?: string | null;
   endedAt?: string | null;
 };
@@ -154,6 +161,8 @@ export async function update(
     payload.current_position = patch.currentPosition;
   if (patch.responseCount !== undefined)
     payload.response_count = patch.responseCount;
+  if (patch.votingEndsAt !== undefined)
+    payload.voting_ends_at = patch.votingEndsAt;
   if (patch.startedAt !== undefined) payload.started_at = patch.startedAt;
   if (patch.endedAt !== undefined) payload.ended_at = patch.endedAt;
 

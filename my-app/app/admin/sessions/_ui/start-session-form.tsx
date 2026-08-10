@@ -15,6 +15,7 @@ import { startSession } from "../actions";
 export function StartSessionForm({ batches }: { batches: StartableBatch[] }) {
   const router = useRouter();
   const [batchId, setBatchId] = useState(batches[0]?.id ?? "");
+  const [seconds, setSeconds] = useState("");
   const [error, setError] = useState<ErrorLike | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,8 +37,14 @@ export function StartSessionForm({ batches }: { batches: StartableBatch[] }) {
   function onStart() {
     if (empty) return;
     setError(null);
+    // Empty input = untimed session; the action zod-checks the range.
+    const votingSeconds = seconds.trim() === "" ? null : Number(seconds);
+    if (votingSeconds !== null && !Number.isInteger(votingSeconds)) {
+      setError("Seconds per question must be a whole number.");
+      return;
+    }
     startTransition(async () => {
-      const result = await startSession(batchId);
+      const result = await startSession(batchId, votingSeconds);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -62,6 +69,21 @@ export function StartSessionForm({ batches }: { batches: StartableBatch[] }) {
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-2 text-[12.5px] text-muted-2">
+          Timer
+          <input
+            type="number"
+            min={5}
+            max={3600}
+            step={5}
+            value={seconds}
+            onChange={(e) => setSeconds(e.target.value)}
+            disabled={pending}
+            placeholder="off"
+            className="w-20 rounded-[7px] border border-line bg-white px-2.5 py-2 text-[13px] text-ink"
+          />
+          sec / question
+        </label>
         <SubmitButton
           type="button"
           onClick={onStart}

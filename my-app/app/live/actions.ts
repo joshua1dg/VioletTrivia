@@ -96,9 +96,18 @@ export async function submitLiveAnswer(
     // `responses.submitLive` has no notion of the room's phase — this is
     // what actually stops a submit once voting has moved on to locked,
     // revealed, or the session has ended.
-    const phase = await sessions.getPhase(sessionId);
-    if (phase !== "voting") {
+    const gate = await sessions.getPhase(sessionId);
+    if (gate.phase !== "voting") {
       return { ok: false, message: "Voting is closed for this question." };
+    }
+    // Timed sessions: the deadline is enforced HERE, not by the client's
+    // countdown — a phone with a wrong clock (or a paused tab) doesn't get
+    // extra time. One second of grace absorbs a tap that raced the buzzer.
+    if (
+      gate.votingEndsAt &&
+      Date.now() > new Date(gate.votingEndsAt).getTime() + 1000
+    ) {
+      return { ok: false, message: "Time's up for this question." };
     }
 
     const parsed = submitLiveAnswerInput.parse({

@@ -34,6 +34,8 @@ export type SessionChannelState = {
   phase: SessionPhase;
   currentQuestionId: string | null;
   responseCount: number;
+  /** Deadline for the current voting window (timed sessions), else null. */
+  votingEndsAt: string | null;
   /** Distinct presence keys currently tracked on this channel. 0 until the
    * first presence sync — never a stale count, but also never instant. */
   headcount: number;
@@ -44,6 +46,7 @@ export type SessionChannelInit = {
   phase: SessionPhase;
   currentQuestionId: string | null;
   responseCount: number;
+  votingEndsAt: string | null;
 };
 
 export type SessionChannelOptions = {
@@ -59,6 +62,7 @@ type LiveSessionsChangeRow = {
   phase: SessionPhase;
   current_question_id: string | null;
   response_count: number;
+  voting_ends_at: string | null;
 };
 
 export function useSessionChannel(
@@ -70,6 +74,7 @@ export function useSessionChannel(
     phase: init.phase,
     currentQuestionId: init.currentQuestionId,
     responseCount: init.responseCount,
+    votingEndsAt: init.votingEndsAt,
   });
   const [headcount, setHeadcount] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -99,6 +104,7 @@ export function useSessionChannel(
             phase: payload.new.phase,
             currentQuestionId: payload.new.current_question_id,
             responseCount: payload.new.response_count,
+            votingEndsAt: payload.new.voting_ends_at,
           });
         },
       )
