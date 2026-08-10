@@ -105,9 +105,37 @@ export function HostControls({
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className="text-[13px] font-medium text-ink">
-            {live.responseCount} of {live.headcount || "…"} answered
-          </span>
+          {live.phase === "lobby" ? (
+            <span className="text-[13px] font-medium text-ink">
+              {!live.connected
+                ? "… in the room"
+                : live.headcount === 0
+                  ? "Nobody has joined yet"
+                  : `${live.headcount} in the room`}
+            </span>
+          ) : (
+            <>
+              <span className="text-[13px] font-medium text-ink">
+                {live.responseCount} of{" "}
+                {live.connected ? live.headcount : "…"} answered
+              </span>
+              {/* The number the lock/reveal call actually hinges on. Presence
+                  is the denominator, so someone closing their tab mid-question
+                  drops out of it rather than blocking the room forever. */}
+              {live.connected && live.headcount > live.responseCount && (
+                <span className="text-[12.5px] text-warn-ink">
+                  {live.headcount - live.responseCount} still to answer
+                </span>
+              )}
+              {live.connected &&
+                live.headcount > 0 &&
+                live.headcount <= live.responseCount && (
+                  <span className="text-[12.5px] text-muted-2">
+                    Everyone has answered
+                  </span>
+                )}
+            </>
+          )}
           <span className="text-[11.5px] text-faint">
             {live.connected ? "Live" : "Connecting…"}
           </span>

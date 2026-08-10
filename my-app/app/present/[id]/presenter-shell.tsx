@@ -77,7 +77,9 @@ export function PresenterShell({
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="text-[20px] font-semibold">
-            {live.responseCount} of {live.headcount || "…"} answered
+            {live.phase === "lobby"
+              ? `${live.connected ? live.headcount : "…"} in the room`
+              : `${live.responseCount} of ${live.connected ? live.headcount : "…"} answered`}
           </span>
           <span className="text-[13px] capitalize text-white/50">
             {live.phase}
