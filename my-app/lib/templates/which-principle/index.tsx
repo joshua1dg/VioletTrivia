@@ -79,9 +79,13 @@ export function WhichPrincipleReview({
                 >
                   {opt.principleCode} — {principle?.name}
                 </span>
-                {opt.subtext && (
+                {/* The per-option line is the principle's descriptor, looked
+                    up from inPlay by code. It was once an authored `subtext`
+                    field; nothing wrote it, and a second copy of the
+                    descriptor is a second thing to keep in sync (D7). */}
+                {principle?.descriptor && (
                   <span className="text-[12px] leading-normal text-muted @3xl:text-[13px]">
-                    {opt.subtext}
+                    {principle.descriptor}
                   </span>
                 )}
               </span>

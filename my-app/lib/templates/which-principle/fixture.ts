@@ -1,6 +1,13 @@
 import type { WhichPrincipleContent, WhichPrincipleKey } from "@/lib/templates/types";
 
-/** The T1 example from the design doc, so the demo renders something real. */
+/**
+ * The T1 example from the design doc, so the demo renders something real.
+ *
+ * This is the HYDRATED shape — names and descriptors inline — because that is
+ * what the components take. In the app it is produced from the stored shape
+ * (`inPlayCodes`) by the questions service; the fixture skips that step so
+ * `/templates` renders standalone.
+ */
 
 export const whichPrinciplePrompt =
   "Which principle is this excerpt best judged under?";
@@ -32,19 +39,12 @@ export const whichPrincipleContent: WhichPrincipleContent = {
     },
   ],
   // Option id IS the principle code here, so responses.answer and
-  // answer_key.key compare directly without a lookup.
+  // answer_key.key compare directly without a lookup. No per-option subtext:
+  // the line under each option is the principle's descriptor, read from
+  // inPlay by code (D7).
   options: [
-    {
-      id: "S1",
-      principleCode: "S1",
-      subtext:
-        "The content is all there; it's the shape of the sentence that costs the reader.",
-    },
-    {
-      id: "C1",
-      principleCode: "C1",
-      subtext: "The reader is left unsure what was agreed, changed, or left behind.",
-    },
+    { id: "S1", principleCode: "S1" },
+    { id: "C1", principleCode: "C1" },
   ],
   footerHint:
     "Both principles could be argued — pick the one the excerpt actually fails.",

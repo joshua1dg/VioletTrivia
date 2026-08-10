@@ -109,8 +109,14 @@ const MOVES = [
 
 export function WriteFeedbackReveal({
   answerKey,
+  answer,
 }: RevealProps<WriteFeedbackContent, WriteFeedbackKey>) {
   const weak = answerKey.verdictTone === "weak";
+  // There is no key to compare against here (grade is null), so the
+  // participant's own prose sits beside the exemplar and the comparison is
+  // theirs to make — the same "here's yours, here's the model's" move the
+  // other two reveals make with a pick and an order.
+  const yours = answer.feedback?.trim();
 
   return (
     <div className="flex flex-col gap-4">
@@ -156,6 +162,15 @@ export function WriteFeedbackReveal({
       </div>
 
       <div className="h-px bg-line-2" />
+
+      {yours && (
+        <div className="flex flex-col gap-2">
+          <Label>YOUR FEEDBACK</Label>
+          <div className="rounded-[10px] border border-line bg-surface px-4 py-4 text-[13px] leading-[1.7] whitespace-pre-wrap text-ink-3 @3xl:text-[13.5px]">
+            {yours}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <Label>FEEDBACK THAT LANDS</Label>
