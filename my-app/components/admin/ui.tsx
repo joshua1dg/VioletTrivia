@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { QuestionStatus } from "@/lib/admin/fixtures";
+// The status union belongs to the questions domain, and its one definition
+// is the `questionStatus` zod enum (`lib/schemas` carries no `server-only`,
+// so a shared presentational file may take a type from it — PLAN §5.7).
+import type { QuestionStatusInput as QuestionStatus } from "@/lib/schemas/questions";
 
 /** Title, count line, and right-hand actions. Same on every admin screen. */
 export function PageHeader({
@@ -25,18 +28,29 @@ export function PageHeader({
   );
 }
 
+/**
+ * `type` defaults to "button" on both buttons below, so dropping one inside
+ * a form never submits it by accident; pass `type="submit"` when that IS
+ * the intent. `onClick` and `disabled` are optional and change nothing when
+ * omitted — the look is fixed, only the wiring is caller-supplied.
+ */
 export function PrimaryButton({
   children,
   onClick,
+  type = "button",
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
 }) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
-      className="cursor-pointer rounded-[7px] bg-violet px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-ink"
+      disabled={disabled}
+      className="cursor-pointer rounded-[7px] bg-violet px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-ink disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>
@@ -61,11 +75,23 @@ export function PrimaryLink({
   );
 }
 
-export function GhostButton({ children }: { children: ReactNode }) {
+export function GhostButton({
+  children,
+  onClick,
+  type = "button",
+  disabled,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+}) {
   return (
     <button
-      type="button"
-      className="cursor-pointer rounded-[7px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className="cursor-pointer rounded-[7px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>

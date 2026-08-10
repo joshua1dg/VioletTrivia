@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { topicCounts } from "@/lib/admin/fixtures";
+
+import { signOut } from "@/app/login/actions";
 
 /**
  * Client component only because the active item needs the current pathname.
- * Everything else here is static.
+ * Everything else here is static — the topic counts are read on the server
+ * by `app/admin/layout.tsx` and passed in, so this file touches no service.
+ *
+ * The sign-out control is a plain `<form action={signOut}>`. A Server Action
+ * imported into a client component is just a reference to it, so this needs
+ * no extra boundary and no client-side handler.
  */
 
 const NAV = [
@@ -20,9 +26,10 @@ const NAV = [
   { href: "/admin/reports", label: "Reports" },
 ];
 
-export function Sidebar() {
+export type SidebarTopic = { slug: string; label: string; questionCount: number };
+
+export function Sidebar({ topics }: { topics: SidebarTopic[] }) {
   const pathname = usePathname();
-  const counts = topicCounts();
 
   return (
     <aside className="flex w-[212px] shrink-0 flex-col gap-6 border-r border-line-2 bg-surface px-3.5 py-5">
@@ -52,16 +59,31 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-2 px-2.5">
-        <span className="text-[11px] tracking-[0.06em] text-faint">TOPICS</span>
-        <div className="flex flex-col gap-1.5 text-[12.5px] text-muted">
-          {counts.map((t) => (
-            <div key={t.slug} className="flex justify-between gap-2">
-              <span className="truncate">{t.label}</span>
-              <span className="text-faint">{t.count}</span>
+      <div className="mt-auto flex flex-col gap-5">
+        {topics.length > 0 && (
+          <div className="flex flex-col gap-2 px-2.5">
+            <span className="text-[11px] tracking-[0.06em] text-faint">
+              TOPICS
+            </span>
+            <div className="flex flex-col gap-1.5 text-[12.5px] text-muted">
+              {topics.map((t) => (
+                <div key={t.slug} className="flex justify-between gap-2">
+                  <span className="truncate">{t.label}</span>
+                  <span className="text-faint">{t.questionCount}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        <form action={signOut} className="border-t border-line-2 pt-3">
+          <button
+            type="submit"
+            className="w-full cursor-pointer rounded-md px-2.5 py-2 text-left text-[13px] text-muted transition-colors hover:bg-line-3 hover:text-ink-4"
+          >
+            Sign out
+          </button>
+        </form>
       </div>
     </aside>
   );

@@ -8,8 +8,8 @@ export default function Home() {
         Alignment review
       </h1>
       <p className="text-[14px] leading-[1.65] text-muted-2">
-        Nothing wired to the database yet. The question templates are built and
-        interactive.
+        Reviewers arrive by link or by room number. The templates page renders
+        each question shape on its own, with no session behind it.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link
@@ -17,6 +17,12 @@ export default function Home() {
           className="rounded-[9px] bg-violet px-5 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-violet-ink"
         >
           Question templates
+        </Link>
+        <Link
+          href="/join"
+          className="rounded-[9px] border border-line px-5 py-2.5 text-[14px] font-medium text-ink-4 transition-colors hover:bg-surface"
+        >
+          Join a room
         </Link>
         <Link
           href="/admin"
