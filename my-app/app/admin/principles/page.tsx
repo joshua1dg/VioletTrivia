@@ -1,13 +1,18 @@
 import { PageHeader } from "@/components/admin/ui";
-import { principleUsage, principles } from "@/lib/admin/fixtures";
+import { listPrinciplesWithUsage } from "@/lib/services/principles";
 
 /**
- * Read-only on purpose. The rubric is fixed — codes are inserted straight
- * into the database, not authored here — so this screen exists to look them
- * up while writing questions, and to show which ones still lack text.
+ * READ-ONLY (D15) — no add, no edit, no delete control anywhere, and no
+ * action module exists for this screen. The rubric is fixed vocabulary
+ * seeded straight into the database; this screen exists to look codes up
+ * while authoring a `which_principle` question, and to show which ones
+ * still lack text. A plain Server Component is enough — there is no
+ * mutation and therefore no pending/error state to own (PLAN §5.6: reads
+ * have no loading state).
  */
-export default function PrinciplesPage() {
-  const incomplete = principles.filter((p) => !p.name || !p.descriptor);
+export default async function PrinciplesPage() {
+  const principles = await listPrinciplesWithUsage();
+  const incomplete = principles.filter((p) => !p.name || !p.shortDescriptor);
 
   return (
     <>
@@ -24,22 +29,22 @@ export default function PrinciplesPage() {
             </span>{" "}
             {incomplete.length === 1 ? "has" : "have"} no name or descriptor.
             They appear as chips on the T3 example but nothing in the design
-            defines them. A <span className="font-mono text-[12px]">
-              which_principle
-            </span>{" "}
+            defines them. A{" "}
+            <span className="font-mono text-[12px]">which_principle</span>{" "}
             question can&rsquo;t be authored against a code that has no text.
           </p>
         )}
 
         <div className="flex flex-col gap-2.5">
           {principles.map((p) => {
-            const used = principleUsage(p.code);
-            const blank = !p.name || !p.descriptor;
+            const blank = !p.name || !p.shortDescriptor;
             return (
               <div
                 key={p.code}
                 className={`flex gap-4 rounded-[10px] border p-4 ${
-                  blank ? "border-dashed border-line-4 bg-surface" : "border-line bg-white"
+                  blank
+                    ? "border-dashed border-line-4 bg-surface"
+                    : "border-line bg-white"
                 }`}
               >
                 <span className="w-8 shrink-0 pt-0.5 font-mono text-[12px] text-violet-ink">
@@ -51,25 +56,30 @@ export default function PrinciplesPage() {
                       p.name ? "text-ink" : "text-faint italic"
                     }`}
                   >
-                    {p.name || "Untitled — needs a name"}
+                    {p.name || "Untitled — needs writing"}
                   </span>
-                  {p.descriptor ? (
+                  {p.shortDescriptor ? (
                     <span className="text-[13px] leading-[1.55] text-muted">
-                      {p.descriptor}
+                      {p.shortDescriptor}
                     </span>
                   ) : (
                     <span className="text-[13px] text-faint italic">
                       No descriptor
                     </span>
                   )}
-                  {p.description && (
+                  {p.fullDescription && (
                     <span className="text-[12.5px] leading-[1.6] text-muted-3">
-                      {p.description}
+                      {p.fullDescription}
+                    </span>
+                  )}
+                  {!p.active && (
+                    <span className="text-[11.5px] tracking-[0.04em] text-faint">
+                      INACTIVE — not offered to authors
                     </span>
                   )}
                 </div>
                 <span className="shrink-0 self-start text-[12.5px] whitespace-nowrap text-muted-3">
-                  {used} question{used === 1 ? "" : "s"}
+                  {p.questionCount} question{p.questionCount === 1 ? "" : "s"}
                 </span>
               </div>
             );
