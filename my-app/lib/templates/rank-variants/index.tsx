@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect } from "react";
+
 import { Excerpt } from "@/components/question/excerpt";
 import type {
   RankVariantsContent,
@@ -15,7 +19,8 @@ import type {
  * Reordering is a pair of arrow buttons rather than drag. That removes the
  * whole pointer/touch/keyboard problem: buttons are already focusable, work
  * identically on a phone and a laptop, and can't be confused with a scroll
- * gesture. It also means this component holds no state and needs no hooks.
+ * gesture. The component holds no state of its own — the one hook it has
+ * pushes the default order up into the caller's answer state (see below).
  *
  * The controls sit left of the rank badge when the card is wide and at the
  * far right on a phone; the structural note is dropped on a phone. Both are
@@ -141,6 +146,17 @@ export function RankVariantsReview({
 }: ReviewProps<RankVariantsContent>) {
   const order = answer.order ?? content.options.map((o) => o.id);
   const letters = letterMap(content.options);
+
+  // COMMIT the default order the card is showing. Every submit gate in the
+  // app ("ranking always has an order") assumes the rendered order IS the
+  // answer — but until this runs, the default lives only in this render and
+  // an untouched ranking submits `{}`: it grades 0 against any key and
+  // contributes nothing to the presenter tally, which then shows empty bars
+  // under "1 answered". Guarded so it fires once per question; inert where
+  // the presenter renders this read-only (its onAnswer is a no-op).
+  useEffect(() => {
+    if (!answer.order) onAnswer({ order: content.options.map((o) => o.id) });
+  }, [answer.order, content.options, onAnswer]);
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= order.length) return;

@@ -65,8 +65,9 @@ function isAnswered(template: TemplateKey, answer: Answer): boolean {
     case "write_feedback":
       return Boolean(answer.feedback?.trim());
     case "rank_variants":
-      // Ranking always has an order — the component defaults it — so there
-      // is nothing to withhold submission on, matching the demo.
+      // Ranking always has an order — the Review component commits its
+      // default into the answer on mount — so there is nothing to withhold
+      // submission on, matching the demo.
       return true;
   }
 }

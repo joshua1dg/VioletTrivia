@@ -102,9 +102,12 @@ export function PresenterShell({
           </div>
           <div className="flex flex-col items-end gap-1">
             <span className="text-[20px] font-semibold">
+              {/* Presence can drop below the response count (answer, then
+                  close the tab), so the denominator is clamped — the room
+                  should never read "1 of 0 answered". */}
               {live.phase === "lobby"
                 ? `${live.connected ? live.headcount : "…"} in the room`
-                : `${live.responseCount} of ${live.connected ? live.headcount : "…"} answered`}
+                : `${live.responseCount} of ${live.connected ? Math.max(live.headcount, live.responseCount) : "…"} answered`}
             </span>
             <span className="text-[13px] capitalize text-white/50">
               {live.phase}

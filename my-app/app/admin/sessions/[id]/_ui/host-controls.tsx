@@ -321,11 +321,17 @@ export function HostControlsBar({
             <>
               <span className={t.strong}>
                 {live.responseCount} of{" "}
-                {live.connected ? live.headcount : "…"} answered
+                {live.connected
+                  ? Math.max(live.headcount, live.responseCount)
+                  : "…"}{" "}
+                answered
               </span>
               {/* The number the lock/reveal call actually hinges on. Presence
                   is the denominator, so someone closing their tab mid-question
-                  drops out of it rather than blocking the room forever. */}
+                  drops out of it rather than blocking the room forever. It
+                  can therefore also drop BELOW the response count — someone
+                  answers and then leaves — so the denominator is clamped to
+                  at least the count; "1 of 0 answered" reads as a bug. */}
               {live.connected && live.headcount > live.responseCount && (
                 <span className={t.warnText}>
                   {live.headcount - live.responseCount} still to answer

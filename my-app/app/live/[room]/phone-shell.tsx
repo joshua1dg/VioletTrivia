@@ -275,9 +275,10 @@ function canSubmit(current: ReviewerQuestion, answer: Answer): boolean {
     case "which_principle":
       return !!answer.option;
     case "rank_variants":
-      // A complete ranking exists from the moment the card renders (the
-      // authored order); reordering is optional, submitting isn't gated on
-      // touching it — same as the /templates demo.
+      // A complete ranking exists from the moment the card renders — the
+      // Review component commits its default order into the answer on mount
+      // — so reordering is optional and submitting isn't gated on touching
+      // it. Same as the /templates demo.
       return true;
     case "write_feedback":
       return !!answer.feedback?.trim();
