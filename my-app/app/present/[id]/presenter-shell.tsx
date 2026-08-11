@@ -69,6 +69,9 @@ export function PresenterShell({
 }) {
   const router = useRouter();
   const live = useSessionChannel(sessionId, initial);
+  // The home page IS the join screen now, so the room gets the bare site
+  // address, not a path. Protocol stripped for legibility on a projector.
+  const joinHost = new URL(joinUrl).host;
   const secondsLeft = useCountdown(
     live.phase === "voting" ? live.votingEndsAt : null,
   );
@@ -97,7 +100,7 @@ export function PresenterShell({
               {formatRoomNumber(roomNumber)}
             </h1>
             <span className="text-[13px] text-white/50">
-              Join at <code className="text-white/80">/join</code>
+              Join at <code className="text-white/80">{joinHost}</code>
             </span>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -150,7 +153,7 @@ export function PresenterShell({
               <p className="max-w-[52ch] text-[15px] leading-[1.6] text-white/55">
                 {joinUrl}
                 <br />
-                or go to <code className="text-white/85">/join</code> and enter
+                or go to <code className="text-white/85">{joinHost}</code> and enter
                 room{" "}
                 <span className="font-medium text-white/85">
                   {formatRoomNumber(roomNumber)}
