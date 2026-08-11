@@ -31,13 +31,17 @@ export {
   setQuestions,
   saveBatch,
   deleteBatch,
+  getMyPodLink,
+  listMyPodLinks,
   type Batch,
   type BatchSaveInput,
   type BatchAccess,
   type BatchStatus,
   type BatchWithCounts,
+  type BatchListItem,
   type BatchWriteInput,
   type BatchUpdateInput,
+  type BatchLink,
 } from "./batches.service";
 
 export { drawQuestions, hash32 } from "./draw.util";

@@ -149,6 +149,29 @@ export async function saveBatch(
   }
 }
 
+const getMyPodLinkInput = z.object({ batchId: z.uuid() });
+
+export type GetMyPodLinkResult = { ok: true; token: string } | ActionError;
+
+/**
+ * "Get my pod link" (PODS.md Wave 1) — creates (or reveals) the caller's
+ * link to a master batch, idempotently. `batches.getMyPodLink` is the one
+ * that refuses this on the caller's own batch or on another lead's, so the
+ * only thing returned to the client is the token the copy button needs.
+ */
+export async function getMyPodLink(
+  batchId: unknown,
+): Promise<GetMyPodLinkResult> {
+  try {
+    const parsed = getMyPodLinkInput.parse({ batchId });
+    const link = await batches.getMyPodLink(parsed.batchId);
+    revalidatePath("/admin/batches");
+    return { ok: true, token: link.token };
+  } catch (error) {
+    return { ok: false, message: asAppError(error).userMessage };
+  }
+}
+
 export type SetQuestionsResult = { ok: true } | ActionError;
 
 export async function setQuestions(

@@ -1,22 +1,40 @@
 import Link from "next/link";
 
-import type { BatchWithCounts } from "@/lib/services/batches";
+import type { BatchListItem } from "@/lib/services/batches";
 
 import { CopyLinkButton } from "./copy-link-button";
+import { PodLinkButton } from "./pod-link-button";
 
-// No "use client" — presentational except for the one interactive leaf
-// (CopyLinkButton), same reasoning as `app/admin/questions/library.tsx`'s
-// row shape: only the piece that owns state needs the boundary.
+// No "use client" — presentational except for two interactive leaves
+// (CopyLinkButton, PodLinkButton), same reasoning as
+// `app/admin/questions/library.tsx`'s row shape: only the piece that owns
+// state needs the boundary.
 
-const STATUS_TONE: Record<BatchWithCounts["status"], string> = {
+const STATUS_TONE: Record<BatchListItem["status"], string> = {
   active: "text-violet-ink",
   draft: "text-muted-3",
   inactive: "text-faint",
 };
 
-export function BatchListRow({ batch }: { batch: BatchWithCounts }) {
+/**
+ * `canManage` and `myPodLinkToken` are computed by the page, not here — the
+ * page is where the signed-in staff member is known (PODS.md Wave 1: "the
+ * page knows the caller via getStaff()/requireStaff"). This row stays a
+ * pure function of its props, same as before.
+ */
+export function BatchListRow({
+  batch,
+  canManage,
+  myPodLinkToken,
+}: {
+  batch: BatchListItem;
+  canManage: boolean;
+  myPodLinkToken: string | null;
+}) {
+  const isMaster = batch.ownerLabel === null;
+
   return (
-    <div className="grid grid-cols-[1fr_90px_100px_100px_140px_1fr_56px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface">
+    <div className="grid grid-cols-[1fr_130px_80px_90px_90px_110px_1fr_56px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface">
       {/* The name goes to the batch's REPORT — inside the batches section,
           same shape as every other entity; the composer is behind the
           explicit Edit button (2026-08-11: "clicking into it is looking at
@@ -27,6 +45,13 @@ export function BatchListRow({ batch }: { batch: BatchWithCounts }) {
       >
         {batch.name}
       </Link>
+      <span
+        className={`truncate pr-2 text-[12.5px] ${
+          isMaster ? "text-violet-ink" : "text-muted-2"
+        }`}
+      >
+        {isMaster ? "Master" : batch.ownerLabel}
+      </span>
       <span className={`text-[12.5px] capitalize ${STATUS_TONE[batch.status]}`}>
         {batch.status}
       </span>
@@ -43,13 +68,22 @@ export function BatchListRow({ batch }: { batch: BatchWithCounts }) {
           <span className="text-faint">—</span>
         )}
       </span>
-      <CopyLinkButton token={batch.token} />
-      <Link
-        href={`/admin/batches/${batch.id}`}
-        className="justify-self-end rounded-[6px] border border-line px-2 py-1 text-[12px] text-ink-4 transition-colors hover:bg-white"
-      >
-        Edit
-      </Link>
+      <div className="flex items-center gap-2 pr-2">
+        <CopyLinkButton token={batch.token} />
+        {isMaster && (
+          <PodLinkButton batchId={batch.id} initialToken={myPodLinkToken} />
+        )}
+      </div>
+      {canManage ? (
+        <Link
+          href={`/admin/batches/${batch.id}`}
+          className="justify-self-end rounded-[6px] border border-line px-2 py-1 text-[12px] text-ink-4 transition-colors hover:bg-white"
+        >
+          Edit
+        </Link>
+      ) : (
+        <span />
+      )}
     </div>
   );
 }

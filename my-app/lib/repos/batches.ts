@@ -124,6 +124,10 @@ export async function getByIdWithCounts(id: string): Promise<BatchListRow> {
 export type BatchInsert = {
   name: string;
   token: string;
+  // Wave 1 (PODS.md): attribution, not optional metadata — the creator owns
+  // what they create. Callers pass the signed-in staff id, never accept it
+  // from the client (lib/services/batches.createBatch sets it).
+  ownerId: string;
   audience?: string | null;
   expiresAt?: string | null;
   asyncSampleSize?: number | null;
@@ -136,6 +140,7 @@ export async function insert(input: BatchInsert): Promise<BatchRow> {
       .insert({
         name: input.name,
         token: input.token,
+        owner_id: input.ownerId,
         audience: input.audience ?? null,
         expires_at: input.expiresAt ?? null,
         async_sample_size: input.asyncSampleSize ?? null,
