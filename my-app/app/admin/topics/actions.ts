@@ -27,7 +27,6 @@ export async function createTopic(
 ): Promise<ActionResult> {
   try {
     const input = topicInput.parse({
-      slug: formData.get("slug"),
       label: formData.get("label"),
     });
     await topics.createTopic(input);
@@ -49,7 +48,6 @@ export async function updateTopic(
 ): Promise<ActionResult> {
   try {
     const patch = topicUpdateInput.parse({
-      slug: formData.get("slug"),
       label: formData.get("label"),
     });
     await topics.updateTopic(id, patch);

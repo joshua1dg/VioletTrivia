@@ -41,14 +41,6 @@ export function TopicsTable({ topics }: { topics: TopicWithUsage[] }) {
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <p className="max-w-[70ch] rounded-[10px] border border-violet-line bg-violet-tint px-4 py-3 text-[13px] leading-[1.6] text-muted">
-        These are placeholders. The design&rsquo;s topic list — overclaiming,
-        sycophancy, hedging — was really a list of failure modes, which is
-        what the rubric codes are for. Topics are why a question is worth
-        asking. Replace these with your real vocabulary before anyone starts
-        authoring.
-      </p>
-
       <CreateTopicForm count={topics.length} />
 
       <ErrorNote error={reorderError} />
@@ -102,15 +94,6 @@ function CreateTopicForm({ count }: { count: number }) {
           required
           placeholder="Edge case"
           className="w-48 rounded-[7px] border border-line px-3 py-1.5 text-[13.5px] text-ink outline-none focus:border-violet"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-medium text-muted">Slug</span>
-        <input
-          name="slug"
-          required
-          placeholder="edge-case"
-          className="w-40 rounded-[7px] border border-line px-3 py-1.5 font-mono text-[12.5px] text-ink outline-none focus:border-violet"
         />
       </label>
       <SubmitButton>New topic</SubmitButton>
@@ -168,12 +151,11 @@ function TopicRow({
           required
           className="rounded-[6px] border border-line px-2.5 py-1 text-[13.5px] text-ink outline-none focus:border-violet"
         />
-        <input
-          name="slug"
-          defaultValue={topic.slug}
-          required
-          className="rounded-[6px] border border-line px-2.5 py-1 font-mono text-[12px] text-ink outline-none focus:border-violet"
-        />
+        {/* The slug follows the label (service-derived) — shown, not
+            editable, and it will update to match the new label on save. */}
+        <span className="font-mono text-[12px] text-muted-2">
+          {topic.slug}
+        </span>
         <span className="text-[12.5px] text-muted-2 tabular-nums">
           {topic.questionCount}
         </span>

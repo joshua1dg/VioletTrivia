@@ -1,6 +1,7 @@
 import "server-only";
 
 import { requireAdmin } from "@/lib/auth";
+import { AppError } from "@/lib/errors";
 import * as repo from "@/lib/repos/topics";
 import type { TopicInput, TopicUpdateInput } from "@/lib/schemas/topics";
 
@@ -34,7 +35,7 @@ export async function createTopic(input: TopicInput): Promise<Topic> {
   const sortOrder =
     input.sortOrder ?? nextSortOrder(await repo.list());
 
-  return repo.insert({ ...input, sortOrder });
+  return repo.insert({ ...input, slug: slugify(input.label), sortOrder });
 }
 
 export async function updateTopic(
@@ -42,7 +43,32 @@ export async function updateTopic(
   patch: TopicUpdateInput,
 ): Promise<Topic> {
   await requireAdmin();
-  return repo.update(id, patch);
+  // The slug follows the label — one field, one source of truth. A rename
+  // therefore changes the topic's URL (/admin/topics/[slug], ?topic=);
+  // acceptable for an internal tool, and the alternative (a frozen slug
+  // that stops matching its label) confuses forever rather than once.
+  return repo.update(
+    id,
+    patch.label === undefined
+      ? patch
+      : { ...patch, slug: slugify(patch.label) },
+  );
+}
+
+/** "Frustrated user" → "frustrated-user". Lowercase, every run of anything
+ * that isn't a letter or digit becomes one dash. */
+function slugify(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!slug) {
+    throw new AppError(
+      "validation",
+      "A topic label needs at least one letter or number.",
+    );
+  }
+  return slug;
 }
 
 /**

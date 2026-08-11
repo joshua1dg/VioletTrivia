@@ -9,18 +9,10 @@ import { z } from "zod";
  * vocabulary (§3), which is a UI edit rather than a migration.
  */
 
-const slug = z
-  .string()
-  .trim()
-  .min(1)
-  .max(64)
-  .regex(
-    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "Use lowercase letters, numbers and hyphens.",
-  );
-
+// No slug field: the slug is DERIVED from the label in the service
+// (lowercased, spaces → dashes) rather than typed by the admin
+// (2026-08-11 — "much easier than having them create an actual slug").
 export const topicInput = z.object({
-  slug,
   label: z.string().trim().min(1, "A topic needs a label.").max(120),
   sortOrder: z.number().int().optional(),
 });

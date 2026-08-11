@@ -20,7 +20,7 @@ export default async function PrinciplesPage() {
     <>
       <PageHeader
         title="Principles"
-        meta={`${principles.length} codes · reference only, seeded in the database`}
+        meta={`${principles.length} codes · read-only reference`}
       />
 
       <div className="flex flex-col gap-4 p-6">
