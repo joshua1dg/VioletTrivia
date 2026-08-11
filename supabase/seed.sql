@@ -861,3 +861,189 @@ select '00000000-0000-4000-a000-000000000303', id, pos from (values
   ('00000000-0000-4000-a000-000000000214'::uuid, 7),
   ('00000000-0000-4000-a000-000000000201'::uuid, 8)
 ) as q(id, pos);
+-- ---------------------------------------------------------------------
+-- Fake contestants + answers, so reports have a real-looking shape.
+--
+-- Twelve participants (…0401–0412), varied coverage: two did all three
+-- batches, three did two, seven did one. Answer patterns are deliberate,
+-- not random — the misses land on the rubric's documented confusions
+-- (C2 read as V2, S1/S2 blurred, S3 missed as S1), so the confusion
+-- chips on the principle reports show something true to life.
+--
+-- Question 201 lives in BOTH 'Spot the miss' and 'Feedback clinic';
+-- participants 401/402/405 answer it in each, exercising the per-batch
+-- dedupe and the org-wide first-answer rule on its question report.
+-- ---------------------------------------------------------------------
+
+insert into participants (id, entry_batch) values
+  ('00000000-0000-4000-a000-000000000401', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000402', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000403', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000404', '00000000-0000-4000-a000-000000000302'),
+  ('00000000-0000-4000-a000-000000000405', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000406', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000407', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000408', '00000000-0000-4000-a000-000000000301'),
+  ('00000000-0000-4000-a000-000000000409', '00000000-0000-4000-a000-000000000302'),
+  ('00000000-0000-4000-a000-000000000410', '00000000-0000-4000-a000-000000000302'),
+  ('00000000-0000-4000-a000-000000000411', '00000000-0000-4000-a000-000000000303'),
+  ('00000000-0000-4000-a000-000000000412', '00000000-0000-4000-a000-000000000303')
+on conflict (id) do nothing;
+
+-- ------------------------------------------------------------------
+-- 'Spot the miss' (…0301) — participants 401 402 403 405 406 407 408
+-- Eight which_principle picks each, ~2 days ago.
+-- ------------------------------------------------------------------
+with picks(qid, options) as (values
+  ('00000000-0000-4000-a000-000000000201', array['C2','C2','V2','C2','V2','C4','C2']),
+  ('00000000-0000-4000-a000-000000000202', array['C3','C1','C3','C3','S3','C3','C1']),
+  ('00000000-0000-4000-a000-000000000203', array['S2','S2','S1','S2','S1','V1','S2']),
+  ('00000000-0000-4000-a000-000000000204', array['C4','I2','C4','C4','C4','I2','C2']),
+  ('00000000-0000-4000-a000-000000000205', array['S1','S2','S2','S1','C1','S1','S2']),
+  ('00000000-0000-4000-a000-000000000206', array['V1','V1','V3','V2','V1','V1','S2']),
+  ('00000000-0000-4000-a000-000000000207', array['V2','S2','V2','V2','S2','V2','V1']),
+  ('00000000-0000-4000-a000-000000000208', array['V3','V3','V1','V3','V3','V1','V3'])
+),
+people(ord, pid) as (values
+  (1,'00000000-0000-4000-a000-000000000401'),(2,'00000000-0000-4000-a000-000000000402'),
+  (3,'00000000-0000-4000-a000-000000000403'),(4,'00000000-0000-4000-a000-000000000405'),
+  (5,'00000000-0000-4000-a000-000000000406'),(6,'00000000-0000-4000-a000-000000000407'),
+  (7,'00000000-0000-4000-a000-000000000408')
+)
+insert into responses (question_id, participant_id, batch_id, answer, created_at)
+select picks.qid::uuid, people.pid::uuid, '00000000-0000-4000-a000-000000000301',
+       jsonb_build_object('option', picks.options[people.ord]),
+       now() - interval '2 days' + (people.ord * interval '11 minutes')
+         + (substring(picks.qid from 36 for 1))::int * interval '90 seconds'
+from picks, people;
+
+-- ------------------------------------------------------------------
+-- 'Rank and file' (…0302) — participants 401 402 403 404 409 410
+-- Six rankings + two which_principle, ~30 hours ago.
+-- ------------------------------------------------------------------
+with rank_picks(qid, orders) as (values
+  ('00000000-0000-4000-a000-000000000215', array['["a","b","c"]','["a","b","c"]','["b","a","c"]','["a","b","c"]','["a","c","b"]','["a","b","c"]']),
+  ('00000000-0000-4000-a000-000000000216', array['["a","b","c"]','["a","c","b"]','["a","b","c"]','["a","b","c"]','["a","b","c"]','["b","a","c"]']),
+  ('00000000-0000-4000-a000-000000000217', array['["a","b","c"]','["a","b","c"]','["a","b","c"]','["a","c","b"]','["a","b","c"]','["a","b","c"]']),
+  ('00000000-0000-4000-a000-000000000218', array['["a","b","c"]','["a","b","c"]','["a","c","b"]','["a","b","c"]','["a","c","b"]','["a","b","c"]']),
+  ('00000000-0000-4000-a000-000000000219', array['["a","b","c"]','["a","c","b"]','["a","c","b"]','["a","b","c"]','["a","b","c"]','["a","c","b"]']),
+  ('00000000-0000-4000-a000-000000000220', array['["a","c","b"]','["a","b","c"]','["a","c","b"]','["a","c","b"]','["a","b","c"]','["a","c","b"]'])
+),
+people(ord, pid) as (values
+  (1,'00000000-0000-4000-a000-000000000401'),(2,'00000000-0000-4000-a000-000000000402'),
+  (3,'00000000-0000-4000-a000-000000000403'),(4,'00000000-0000-4000-a000-000000000404'),
+  (5,'00000000-0000-4000-a000-000000000409'),(6,'00000000-0000-4000-a000-000000000410')
+)
+insert into responses (question_id, participant_id, batch_id, answer, created_at)
+select rank_picks.qid::uuid, people.pid::uuid, '00000000-0000-4000-a000-000000000302',
+       jsonb_build_object('order', rank_picks.orders[people.ord]::jsonb),
+       now() - interval '30 hours' + (people.ord * interval '9 minutes')
+         + (substring(rank_picks.qid from 36 for 1))::int * interval '80 seconds'
+from rank_picks, people;
+
+with picks(qid, options) as (values
+  ('00000000-0000-4000-a000-000000000209', array['S3','S3','S1','C3','S3','S1']),
+  ('00000000-0000-4000-a000-000000000210', array['I1','C1','I1','I1','V3','I1'])
+),
+people(ord, pid) as (values
+  (1,'00000000-0000-4000-a000-000000000401'),(2,'00000000-0000-4000-a000-000000000402'),
+  (3,'00000000-0000-4000-a000-000000000403'),(4,'00000000-0000-4000-a000-000000000404'),
+  (5,'00000000-0000-4000-a000-000000000409'),(6,'00000000-0000-4000-a000-000000000410')
+)
+insert into responses (question_id, participant_id, batch_id, answer, created_at)
+select picks.qid::uuid, people.pid::uuid, '00000000-0000-4000-a000-000000000302',
+       jsonb_build_object('option', picks.options[people.ord]),
+       now() - interval '29 hours' + (people.ord * interval '9 minutes')
+from picks, people;
+
+-- ------------------------------------------------------------------
+-- 'Feedback clinic' (…0303) — participants 401 402 404 405 411 412
+-- Four written-feedback answers, four which_principle, plus 201 again,
+-- ~20 hours ago (LATER than 'Spot the miss', so the org-wide question
+-- report's first-answer rule keeps the 0301 answers for 401/402/405).
+-- ------------------------------------------------------------------
+with picks(qid, options) as (values
+  ('00000000-0000-4000-a000-000000000211', array['I2','I2','C4','I2','I2','C4']),
+  ('00000000-0000-4000-a000-000000000212', array['I3','C3','I3','I3','I1','I3']),
+  ('00000000-0000-4000-a000-000000000213', array['S1','S1','S1','C1','S1','V1']),
+  ('00000000-0000-4000-a000-000000000214', array['C4','C3','C4','C2','C4','C4']),
+  ('00000000-0000-4000-a000-000000000201', array['C2','V2','C2','C2','V2','C2'])
+),
+people(ord, pid) as (values
+  (1,'00000000-0000-4000-a000-000000000401'),(2,'00000000-0000-4000-a000-000000000402'),
+  (3,'00000000-0000-4000-a000-000000000404'),(4,'00000000-0000-4000-a000-000000000405'),
+  (5,'00000000-0000-4000-a000-000000000411'),(6,'00000000-0000-4000-a000-000000000412')
+)
+insert into responses (question_id, participant_id, batch_id, answer, created_at)
+select picks.qid::uuid, people.pid::uuid, '00000000-0000-4000-a000-000000000303',
+       jsonb_build_object('option', picks.options[people.ord]),
+       now() - interval '20 hours' + (people.ord * interval '13 minutes')
+         + (substring(picks.qid from 36 for 1))::int * interval '70 seconds'
+from picks, people;
+
+with texts(qid, answers) as (values
+  ('00000000-0000-4000-a000-000000000221', array[
+    $$Right that it held the line, but the grade skips the conduct — "take a databases class" is condescension and the last sentence just overrides the user. Good instinct, wrong verdict.$$,
+    $$Agree with not caving, disagree with Good. The response lectures and then implements the opposite without asking what's behind the request.$$,
+    $$Good grade. The model was technically correct and firmness matters more than tone here.$$,
+    $$The rationale only grades the conclusion. C4 is about how you disagree — credit the idea, give a reason, stay open. This does none of that.$$,
+    $$I'd flip it. Steamrolling plus a jab at the user's education is exactly what C4 names, even when the engineering is right.$$,
+    $$Half right: no flip-flop is good. But point at the actual lines — the class remark, the unilateral "I'll go ahead" — and the grade falls apart.$$
+  ]),
+  ('00000000-0000-4000-a000-000000000222', array[
+    $$"Just style" undersells it — S2 exists because this packaging costs trust. Correct fix, failing delivery; the grade has to hold both.$$,
+    $$Count the tics: Absolutely, bottom line, honest take, narrow fix, not-just-X. That's five in one answer. Style is part of the product.$$,
+    $$Agree with the reviewer honestly — the diagnosis is right and users can skim past the fluff.$$,
+    $$The verification work is good. But a correct answer delivered like a slot machine still reads machine-generated, and that's what S2 measures.$$,
+    $$Wrong grade. If wrapping didn't matter we wouldn't have an S2 row on the rubric at all.$$,
+    $$I'd say correct-on-substance, fail-on-delivery, and name the specific phrases. Letting one dimension absorb the other is how tics survive review.$$
+  ]),
+  ('00000000-0000-4000-a000-000000000223', array[
+    $$The trust question is right but this response answers it: 31 occurrences, suite green. A rename earns two sentences — the changelog version is S1's own bad example.$$,
+    $$Disagree with Bad. Ask what the user could DO with headers and a file list here. Nothing — so brevity is the feature, not laziness.$$,
+    $$I'm with the reviewer — for code changes I want the file list every time.$$,
+    $$Flip it. Short and sufficient beats long and thorough-looking; the rubric literally uses the templated changelog as the failure case.$$,
+    $$Bad grade punishes the response for refusing to pad. Count and verification are both there — that's everything the task needs.$$,
+    $$The instinct (can I trust it?) is right, mis-calibrated. Two sentences that answer the question beat five sections that decorate it.$$
+  ]),
+  ('00000000-0000-4000-a000-000000000224', array[
+    $$This isn't giving up — the premise was checked and refuted, the real cause found, and the one step the model can't take handed over with instructions. That's C3 working.$$,
+    $$Disagree. "Keep trying" against a permissions wall is spinning, and pretending progress would be the actual C3 failure.$$,
+    $$Agree with Bad — the model should have at least attempted a workaround before punting to an admin.$$,
+    $$The anti-punting instinct is right, but the test is what one more hour would produce. Here: nothing. Honest handoff with a path beats busy-and-stuck.$$,
+    $$I'd rate it Good. Blocked-and-clear, with who to ask and how long it takes. What else is there?$$,
+    $$Separate "gave up" from "surfaced a hard blocker". This one names the cause, the owner, and the fix — that's the opposite of giving up.$$
+  ])
+),
+people(ord, pid) as (values
+  (1,'00000000-0000-4000-a000-000000000401'),(2,'00000000-0000-4000-a000-000000000402'),
+  (3,'00000000-0000-4000-a000-000000000404'),(4,'00000000-0000-4000-a000-000000000405'),
+  (5,'00000000-0000-4000-a000-000000000411'),(6,'00000000-0000-4000-a000-000000000412')
+)
+insert into responses (question_id, participant_id, batch_id, answer, created_at)
+select texts.qid::uuid, people.pid::uuid, '00000000-0000-4000-a000-000000000303',
+       jsonb_build_object('feedback', texts.answers[people.ord]),
+       now() - interval '19 hours' + (people.ord * interval '13 minutes')
+from texts, people;
+
+-- A few "Why?" notes, for flavor on the reveal screens.
+update responses set rationale = 'The reply ignores how angry the user is — same voice it would use for good news.'
+  where participant_id = '00000000-0000-4000-a000-000000000401'
+    and question_id = '00000000-0000-4000-a000-000000000201'
+    and batch_id = '00000000-0000-4000-a000-000000000301';
+update responses set rationale = 'Sounded cold to me, so I went with the voice principle.'
+  where participant_id = '00000000-0000-4000-a000-000000000403'
+    and question_id = '00000000-0000-4000-a000-000000000201'
+    and batch_id = '00000000-0000-4000-a000-000000000301';
+update responses set rationale = 'Hedging twice in one sentence was the tell.'
+  where participant_id = '00000000-0000-4000-a000-000000000405'
+    and question_id = '00000000-0000-4000-a000-000000000202'
+    and batch_id = '00000000-0000-4000-a000-000000000301';
+update responses set rationale = 'The updates say nothing — that has to be the updates principle.'
+  where participant_id = '00000000-0000-4000-a000-000000000402'
+    and question_id = '00000000-0000-4000-a000-000000000209'
+    and batch_id = '00000000-0000-4000-a000-000000000302';
+update responses set rationale = 'Deleting 2M rows on an assumption is the checkpoint case.'
+  where participant_id = '00000000-0000-4000-a000-000000000412'
+    and question_id = '00000000-0000-4000-a000-000000000212'
+    and batch_id = '00000000-0000-4000-a000-000000000303';
