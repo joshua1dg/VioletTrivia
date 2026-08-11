@@ -18,7 +18,7 @@ import type { Database } from "./database.types";
  */
 export function serviceClient() {
   const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const key = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const key = requireEnv("SUPABASE_SECRET_KEY");
 
   return createClient<Database>(url, key, {
     auth: {
@@ -29,7 +29,7 @@ export function serviceClient() {
 }
 
 /**
- * Anon key + the `next/headers` cookie adapter. Used ONLY to resolve who the
+ * The publishable key + the `next/headers` cookie adapter. Used ONLY to resolve who the
  * staff user is (lib/auth — Wave 2/B2) — never for data. Every data read or
  * write, including everything staff-facing, goes through `serviceClient()`.
  *
@@ -39,10 +39,10 @@ export function serviceClient() {
  */
 export async function authClient() {
   const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey = requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const publishableKey = requireEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(url, anonKey, {
+  return createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

@@ -54,8 +54,8 @@ cp my-app/.env.example my-app/.env.local
 ```
 
 Fill `.env.local` from `supabase status`: `API_URL` → `NEXT_PUBLIC_SUPABASE_URL`,
-`ANON_KEY` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SERVICE_ROLE_KEY` →
-`SUPABASE_SERVICE_ROLE_KEY`. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the same
+`ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SERVICE_ROLE_KEY` →
+`SUPABASE_SECRET_KEY`. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the same
 file, then:
 
 ```bash
@@ -320,7 +320,9 @@ session. A successful build that 404s everywhere is an access-control setting,
 not a routing problem.
 
 Environment variables in production: `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. `ADMIN_EMAIL` /
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` — the
+dashboard's Publishable and Secret keys (`sb_publishable_…` /
+`sb_secret_…`); the legacy anon / service_role JWTs fill the same slots. `ADMIN_EMAIL` /
 `ADMIN_PASSWORD` are only for the bootstrap script and belong nowhere near a
 deployment. Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (`openssl rand -base64 32`)
 so multiple instances agree on how to decrypt closed-over Server Action

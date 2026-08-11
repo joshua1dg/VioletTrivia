@@ -69,7 +69,7 @@ async function main() {
   }
 
   const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceRoleKey = requireEnv("SUPABASE_SECRET_KEY");
 
   const supabase = createClient<Database>(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
