@@ -1,9 +1,9 @@
-import { PageHeader, StatusPill, Tag } from "@/components/admin/ui";
+import { PageHeader, StatusPill } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getQuestionReport } from "@/lib/services/reports";
 import { registry } from "@/lib/templates/registry";
 
-import { HeaderLink, TallyBars } from "../../../reports/report-bits";
+import { HeaderLink, LinkChips, TallyBars } from "../../../reports/report-bits";
 import { ScoreBar } from "../../../reports/score-bar";
 
 /**
@@ -42,20 +42,50 @@ export default async function QuestionReportPage({
       <div className="flex flex-col gap-6 p-6">
         <SkippedRowsBanner skipped={report.skipped} />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status={q.status} />
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill status={q.status} />
+            {report.duplicateCount > 0 && (
+              <span className="text-[12px] text-muted-3">
+                {report.duplicateCount} repeat answer
+                {report.duplicateCount === 1 ? "" : "s"} excluded
+              </span>
+            )}
+          </div>
           {report.keyCode && (
-            <Tag>key: {report.keyCode}</Tag>
+            <LinkChips
+              label="Key"
+              items={[
+                {
+                  href: `/admin/principles/${report.keyCode}`,
+                  text: report.keyCode,
+                },
+              ]}
+            />
           )}
-          {report.topics.map((topic) => (
-            <Tag key={topic.slug}>{topic.label}</Tag>
-          ))}
-          {report.duplicateCount > 0 && (
-            <span className="text-[12px] text-muted-3">
-              {report.duplicateCount} repeat answer
-              {report.duplicateCount === 1 ? "" : "s"} excluded
-            </span>
-          )}
+          <LinkChips
+            label="In play"
+            items={report.principleCodes
+              .filter((code) => code !== report.keyCode)
+              .map((code) => ({
+                href: `/admin/principles/${code}`,
+                text: code,
+              }))}
+          />
+          <LinkChips
+            label="Topics"
+            items={report.topics.map((topic) => ({
+              href: `/admin/topics/${topic.slug}`,
+              text: topic.label,
+            }))}
+          />
+          <LinkChips
+            label="Appears in"
+            items={report.batches.map((batch) => ({
+              href: `/admin/batches/${batch.id}/report`,
+              text: batch.name,
+            }))}
+          />
         </div>
 
         {report.total > 0 && (

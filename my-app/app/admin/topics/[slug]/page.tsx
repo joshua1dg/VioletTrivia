@@ -2,7 +2,11 @@ import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getTopicReport } from "@/lib/services/reports";
 
-import { HeaderLink, QuestionStatTable } from "../../reports/report-bits";
+import {
+  HeaderLink,
+  LinkChips,
+  QuestionStatTable,
+} from "../../reports/report-bits";
 import { ScoreBar } from "../../reports/score-bar";
 
 /**
@@ -38,6 +42,23 @@ export default async function TopicReportPage({
 
       <div className="flex flex-col gap-6 p-6">
         <SkippedRowsBanner skipped={report.skipped} />
+
+        <div className="flex flex-col gap-2">
+          <LinkChips
+            label="Codes tested"
+            items={report.keyCodes.map((entry) => ({
+              href: `/admin/principles/${entry.code}`,
+              text: `${entry.code} · ${entry.count}`,
+            }))}
+          />
+          <LinkChips
+            label="Appears in"
+            items={report.batches.map((batch) => ({
+              href: `/admin/batches/${batch.id}/report`,
+              text: batch.name,
+            }))}
+          />
+        </div>
 
         {report.duplicateCount > 0 && (
           <p className="text-[12.5px] text-muted-3">

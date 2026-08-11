@@ -101,6 +101,37 @@ export function QuestionStatTable({ rows }: { rows: QuestionStatRow[] }) {
   );
 }
 
+/**
+ * A row of linked chips — the report pages' relation strips ("Appears in",
+ * topics, codes). Every fact on a report is a link to that fact's own
+ * report (2026-08-11); these are how the flat facts render.
+ */
+export function LinkChips({
+  label,
+  items,
+}: {
+  label: string;
+  items: { href: string; text: string }[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[11.5px] tracking-[0.04em] text-faint">
+        {label.toUpperCase()}
+      </span>
+      {items.map((item) => (
+        <Link
+          key={item.href + item.text}
+          href={item.href}
+          className="rounded-[7px] border border-line bg-surface px-2.5 py-1 text-[12.5px] text-ink-4 transition-colors hover:border-faint-2 hover:bg-white"
+        >
+          {item.text}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 /** The one bordered action link every report header uses. */
 export function HeaderLink({
   href,

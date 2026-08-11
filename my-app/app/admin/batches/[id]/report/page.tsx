@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/admin/ui";
@@ -61,17 +62,24 @@ export default async function BatchReportPage({
           ) : (
             <>
               <div className="flex flex-col">
+                {/* Each bar links to the code's own report — every fact on
+                    a report is a door (2026-08-11). */}
                 {report.rubric.map((row) => (
-                  <ScoreBar
+                  <Link
                     key={row.code}
-                    label={`${row.code} — ${row.name}`}
-                    correct={row.correct}
-                    total={row.total}
-                    note={
-                      row.mostPickedWrong &&
-                      `most-picked wrong: ${row.mostPickedWrong.code}`
-                    }
-                  />
+                    href={`/admin/principles/${row.code}`}
+                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                  >
+                    <ScoreBar
+                      label={`${row.code} — ${row.name}`}
+                      correct={row.correct}
+                      total={row.total}
+                      note={
+                        row.mostPickedWrong &&
+                        `most-picked wrong: ${row.mostPickedWrong.code}`
+                      }
+                    />
+                  </Link>
                 ))}
               </div>
               <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
@@ -92,12 +100,17 @@ export default async function BatchReportPage({
             <>
               <div className="flex flex-col">
                 {report.topics.map((row) => (
-                  <ScoreBar
+                  <Link
                     key={row.slug}
-                    label={row.label}
-                    correct={row.correct}
-                    total={row.total}
-                  />
+                    href={`/admin/topics/${row.slug}`}
+                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                  >
+                    <ScoreBar
+                      label={row.label}
+                      correct={row.correct}
+                      total={row.total}
+                    />
+                  </Link>
                 ))}
               </div>
               <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">

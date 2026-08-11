@@ -166,6 +166,8 @@ export type QuestionReport = {
   tally: TallyGroup[] | null;
   /** `write_feedback` only: the prose answers themselves. */
   feedback: string[];
+  /** Batches whose queue carries this question — the "Appears in" chips. */
+  batches: { id: string; name: string }[];
   skipped: SkippedRow[];
 };
 
@@ -176,11 +178,13 @@ export async function getQuestionReport(
 
   const question = await questionsService.getWithKey(questionId);
 
-  const [responses, principleLinks, topicLinks] = await Promise.all([
-    repo.listResponsesForQuestions([questionId]),
-    repo.listPrincipleLinksForQuestions([questionId]),
-    repo.listTopicLinksForQuestions([questionId]),
-  ]);
+  const [responses, principleLinks, topicLinks, batchLinks] =
+    await Promise.all([
+      repo.listResponsesForQuestions([questionId]),
+      repo.listPrincipleLinksForQuestions([questionId]),
+      repo.listTopicLinksForQuestions([questionId]),
+      repo.listBatchLinksForQuestions([questionId]),
+    ]);
 
   const firstAnswers = dedupeToFirstAnswer(responses.rows);
   const graded = gradeResponses(
@@ -216,6 +220,7 @@ export async function getQuestionReport(
       question.template === "write_feedback"
         ? answers.flatMap((a) => (a.feedback ? [a.feedback] : []))
         : [],
+    batches: dedupeBatches(batchLinks),
     skipped: responses.skipped,
   };
 }
@@ -229,6 +234,10 @@ export type TopicReport = {
   correct: number;
   total: number;
   questions: QuestionStatRow[];
+  /** Rubric codes this topic's questions are keyed to, with counts. */
+  keyCodes: { code: string; name: string; count: number }[];
+  /** Batches carrying any of this topic's questions. */
+  batches: { id: string; name: string }[];
   skipped: SkippedRow[];
 };
 
@@ -241,12 +250,40 @@ export async function getTopicReport(slug: string): Promise<TopicReport> {
   if (!topic) throw new AppError("not_found", "No such topic.");
 
   const questionIds = await repo.listQuestionIdsForTopic(topic.id);
-  const core = await loadQuestionStats(questionIds);
+  const [core, batchLinks, principles] = await Promise.all([
+    loadQuestionStats(questionIds),
+    repo.listBatchLinksForQuestions(questionIds),
+    principlesService.listPrinciples(),
+  ]);
+
+  // Which codes this topic actually tests: the key codes of its
+  // which_principle questions, with how many questions each.
+  const nameByCode = new Map(principles.map((p) => [p.code, p.name]));
+  const keyCounts = new Map<string, number>();
+  for (const question of core.authored) {
+    const code = keyCode(question);
+    if (code) keyCounts.set(code, (keyCounts.get(code) ?? 0) + 1);
+  }
+  const keyCodes = [...keyCounts.entries()]
+    .map(([code, count]) => ({
+      code,
+      name: nameByCode.get(code) ?? code,
+      count,
+    }))
+    .sort((a, b) => a.code.localeCompare(b.code));
 
   return {
     topic: { id: topic.id, slug: topic.slug, label: topic.label },
     questionCount: questionIds.length,
-    ...core,
+    responseCount: core.responseCount,
+    participantCount: core.participantCount,
+    duplicateCount: core.duplicateCount,
+    correct: core.correct,
+    total: core.total,
+    questions: core.questions,
+    keyCodes,
+    batches: dedupeBatches(batchLinks),
+    skipped: core.skipped,
   };
 }
 
@@ -273,6 +310,8 @@ export type PrincipleReport = {
    *  answer — the inbound half of the confusion. */
   wronglyPickedCount: number;
   questions: QuestionStatRow[];
+  /** Batches carrying any question keyed to this code. */
+  batches: { id: string; name: string }[];
   skipped: SkippedRow[];
 };
 
@@ -294,7 +333,10 @@ export async function getPrincipleReport(
   const keyed = inPlay.rows.filter((q) => keyCode(q) === code);
   const keyedIds = keyed.map((q) => q.id);
 
-  const core = await loadQuestionStats(keyedIds);
+  const [core, batchLinks] = await Promise.all([
+    loadQuestionStats(keyedIds),
+    repo.listBatchLinksForQuestions(keyedIds),
+  ]);
 
   const missed = core.graded.filter((g) => g.grade === 0);
   const nameByCode = new Map(
@@ -343,8 +385,20 @@ export async function getPrincipleReport(
     pickedInstead,
     wronglyPickedCount,
     questions: core.questions,
+    batches: dedupeBatches(batchLinks),
     skipped: mergeSkipped(inPlay, { skipped: core.skipped }),
   };
+}
+
+/** Distinct batches out of per-question link rows, in name order. */
+function dedupeBatches(
+  links: repo.BatchLinkRow[],
+): { id: string; name: string }[] {
+  const byId = new Map<string, string>();
+  for (const link of links) byId.set(link.batchId, link.batchName);
+  return [...byId.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -359,6 +413,8 @@ async function loadQuestionStats(questionIds: string[]): Promise<{
   correct: number;
   total: number;
   questions: QuestionStatRow[];
+  /** The parsed questions themselves, for callers that need key codes. */
+  authored: AuthoredQuestion[];
   graded: GradedResponse[];
   skipped: SkippedRow[];
 }> {
@@ -386,6 +442,7 @@ async function loadQuestionStats(questionIds: string[]): Promise<{
     correct: gradeable.filter((g) => g.grade === 1).length,
     total: gradeable.length,
     questions,
+    authored: questionsResult.rows,
     graded,
     skipped: mergeSkipped(questionsResult, responses),
   };

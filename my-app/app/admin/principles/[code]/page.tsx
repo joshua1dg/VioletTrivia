@@ -1,8 +1,14 @@
+import Link from "next/link";
+
 import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getPrincipleReport } from "@/lib/services/reports";
 
-import { HeaderLink, QuestionStatTable } from "../../reports/report-bits";
+import {
+  HeaderLink,
+  LinkChips,
+  QuestionStatTable,
+} from "../../reports/report-bits";
 import { ScoreBar } from "../../reports/score-bar";
 
 /**
@@ -41,6 +47,14 @@ export default async function PrincipleReportPage({
           </p>
         )}
 
+        <LinkChips
+          label="Appears in"
+          items={report.batches.map((batch) => ({
+            href: `/admin/batches/${batch.id}/report`,
+            text: batch.name,
+          }))}
+        />
+
         <section className="flex flex-col gap-1.5">
           <h2 className="text-[12px] tracking-[0.04em] text-faint">
             FOUND WHEN IT WAS THE ANSWER
@@ -75,15 +89,19 @@ export default async function PrincipleReportPage({
                   When {p.code} was missed, people picked:
                 </span>
                 <ul className="flex flex-wrap gap-2">
+                  {/* Each chip opens THAT code's report — chase the
+                      confusion to the other side (2026-08-11). */}
                   {report.pickedInstead.map((pick) => (
-                    <li
-                      key={pick.code}
-                      className="rounded-[7px] border border-line bg-surface px-2.5 py-1 text-[12.5px] text-ink-4"
-                    >
-                      <span className="font-mono text-[11.5px] text-violet-ink">
-                        {pick.code}
-                      </span>{" "}
-                      {pick.name} · {pick.count}×
+                    <li key={pick.code}>
+                      <Link
+                        href={`/admin/principles/${pick.code}`}
+                        className="block rounded-[7px] border border-line bg-surface px-2.5 py-1 text-[12.5px] text-ink-4 transition-colors hover:border-faint-2 hover:bg-white"
+                      >
+                        <span className="font-mono text-[11.5px] text-violet-ink">
+                          {pick.code}
+                        </span>{" "}
+                        {pick.name} · {pick.count}×
+                      </Link>
                     </li>
                   ))}
                 </ul>

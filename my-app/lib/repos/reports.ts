@@ -203,6 +203,39 @@ export async function listResponsesForQuestions(
   return collect(rows, (r) => r.id, mapResponse);
 }
 
+export type BatchLinkRow = {
+  questionId: string;
+  batchId: string;
+  batchName: string;
+};
+
+/** Which batches carry these questions — the "Appears in" chips on the
+ *  entity reports (2026-08-11: every report links to every relation). */
+export async function listBatchLinksForQuestions(
+  questionIds: string[],
+): Promise<BatchLinkRow[]> {
+  if (questionIds.length === 0) return [];
+
+  const rows = unwrap(
+    await serviceClient()
+      .from("batch_questions")
+      .select("question_id, batch_id, batches(name)")
+      .in("question_id", questionIds),
+  );
+
+  return rows.flatMap((row) =>
+    row.batches
+      ? [
+          {
+            questionId: row.question_id,
+            batchId: row.batch_id,
+            batchName: row.batches.name,
+          },
+        ]
+      : [],
+  );
+}
+
 /** Question ids tagged with a topic — the topic report's scope. */
 export async function listQuestionIdsForTopic(
   topicId: string,
