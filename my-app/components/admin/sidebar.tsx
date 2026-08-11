@@ -28,8 +28,20 @@ const NAV = [
 
 export type SidebarTopic = { slug: string; label: string; questionCount: number };
 
-export function Sidebar({ topics }: { topics: SidebarTopic[] }) {
+export function Sidebar({
+  topics,
+  showStaffLink = false,
+}: {
+  topics: SidebarTopic[];
+  /** Admin only — staff management is the system tier (PODS.md). Hiding
+   * the entry is discoverability, not security: `/admin/staff`'s service
+   * calls requireAdmin() regardless. */
+  showStaffLink?: boolean;
+}) {
   const pathname = usePathname();
+  const nav = showStaffLink
+    ? [...NAV, { href: "/admin/staff", label: "Staff" }]
+    : NAV;
 
   return (
     <aside className="flex w-[212px] shrink-0 flex-col gap-6 border-r border-line-2 bg-surface px-3.5 py-5">
@@ -41,7 +53,7 @@ export function Sidebar({ topics }: { topics: SidebarTopic[] }) {
       </Link>
 
       <nav className="flex flex-col gap-0.5">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
@@ -59,13 +71,15 @@ export function Sidebar({ topics }: { topics: SidebarTopic[] }) {
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-5">
+      <div className="mt-auto flex min-h-0 flex-col gap-5">
         {topics.length > 0 && (
-          <div className="flex flex-col gap-2 px-2.5">
+          <div className="flex min-h-0 flex-col gap-2 px-2.5">
             <span className="text-[11px] tracking-[0.06em] text-faint">
               TOPICS
             </span>
-            <div className="flex flex-col gap-1.5 text-[12.5px] text-muted">
+            {/* The one part of the sidebar allowed to scroll: a long topic
+                list must never push sign-out off the bottom of the screen. */}
+            <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto text-[12.5px] text-muted">
               {topics.map((t) => (
                 <div key={t.slug} className="flex justify-between gap-2">
                   <span className="truncate">{t.label}</span>

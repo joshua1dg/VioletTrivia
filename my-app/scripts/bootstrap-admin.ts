@@ -17,6 +17,13 @@
  * script does not have. This script builds its own minimal service-role
  * client with the same two env vars.
  *
+ * Wave 1 adds an in-app Staff screen (/admin/staff, lib/services/staff)
+ * that does this same createUser + upsert for every account AFTER the
+ * first — any admin can add pod leads, project leads or more admins from
+ * the browser now. This script remains the only way to get the first
+ * admin (nobody is signed in yet to use the screen), and the only way back
+ * in after `supabase db reset` wipes auth.users.
+ *
  * Usage (from my-app/):
  *   pnpm bootstrap:admin
  *   pnpm bootstrap:admin -- --email=me@example.com --password=... --display-name="Jane"

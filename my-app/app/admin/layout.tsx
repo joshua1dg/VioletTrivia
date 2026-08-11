@@ -24,8 +24,9 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
+  let staff;
   try {
-    await requireStaff();
+    staff = await requireStaff();
   } catch (err) {
     if (err instanceof AppError && err.kind === "unauthorized") {
       redirect("/login");
@@ -50,15 +51,21 @@ export default async function AdminLayout({
   const topics = await listTopicsWithUsage();
 
   return (
-    <div className="flex min-h-screen bg-white">
+    // h-screen + overflow-hidden pins the shell to the viewport: the
+    // sidebar never scrolls (sign-out stays at the bottom of the monitor),
+    // and the content pane scrolls by itself.
+    <div className="flex h-screen overflow-hidden bg-white">
       <Sidebar
         topics={topics.map((t) => ({
           slug: t.slug,
           label: t.label,
           questionCount: t.questionCount,
         }))}
+        showStaffLink={staff.role === "admin"}
       />
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {children}
+      </main>
     </div>
   );
 }
