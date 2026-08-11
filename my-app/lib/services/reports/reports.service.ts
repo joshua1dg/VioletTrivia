@@ -121,6 +121,91 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
   };
 }
 
+export type OrgReport = {
+  participantCount: number;
+  responseCount: number;
+  duplicateCount: number;
+  /** Questions with at least one answer / all questions. */
+  answeredQuestionCount: number;
+  questionCount: number;
+  correct: number;
+  total: number;
+  rubric: RubricRow[];
+  topics: TopicRow[];
+  /** Key→picked pairs across every which_principle miss, most common
+   *  first — "the team confuses X for Y", ranked. */
+  confusions: {
+    keyCode: string;
+    keyName: string;
+    pickedCode: string;
+    pickedName: string;
+    count: number;
+  }[];
+  batches: BatchReportSummary[];
+  skipped: SkippedRow[];
+};
+
+/**
+ * /admin/reports — the org-wide dashboard: every batch report's sections
+ * with the batch filter removed (2026-08-11: the tab was redundant once
+ * batch rows linked to their own reports; "where is the TEAM miscalibrated
+ * overall" had no home). Same rules as everywhere: dedupe to each
+ * participant's first answer per question — here across ALL batches and
+ * sessions — and grade at read time.
+ */
+export async function getOrgReport(): Promise<OrgReport> {
+  await requireStaff();
+
+  const summaries = await questionsService.listQuestionSummaries();
+  const allIds = summaries.rows.map((q) => q.id);
+
+  const [core, principleLinks, topicLinks, batchRows] = await Promise.all([
+    loadQuestionStats(allIds),
+    repo.listPrincipleLinksForQuestions(allIds),
+    repo.listTopicLinksForQuestions(allIds),
+    repo.listBatchesWithResponseCounts(),
+  ]);
+
+  // Confusion pairs: every wrong which_principle pick, keyed by what the
+  // answer was and what got picked instead.
+  const nameByCode = new Map(principleLinks.map((l) => [l.code, l.name]));
+  const pairCounts = new Map<string, number>();
+  for (const g of core.graded) {
+    if (g.grade !== 0 || g.keyCode === null || g.pickedWrongCode === null)
+      continue;
+    const key = `${g.keyCode}→${g.pickedWrongCode}`;
+    pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
+  }
+  const confusions = [...pairCounts.entries()]
+    .map(([pair, count]) => {
+      const [keyCode, pickedCode] = pair.split("→");
+      return {
+        keyCode,
+        keyName: nameByCode.get(keyCode) ?? keyCode,
+        pickedCode,
+        pickedName: nameByCode.get(pickedCode) ?? pickedCode,
+        count,
+      };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    participantCount: core.participantCount,
+    responseCount: core.responseCount,
+    duplicateCount: core.duplicateCount,
+    answeredQuestionCount: core.questions.filter((q) => q.responseCount > 0)
+      .length,
+    questionCount: allIds.length,
+    correct: core.correct,
+    total: core.total,
+    rubric: buildRubricRows(core.graded, principleLinks),
+    topics: buildTopicRows(core.graded, topicLinks),
+    confusions,
+    batches: batchRows.filter((row) => row.responseCount > 0),
+    skipped: mergeSkipped(summaries, { skipped: core.skipped }),
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Question / topic / principle reports — the entity-centric dashboards
  * (2026-08-11: "everything clicks through to a report"). All three are

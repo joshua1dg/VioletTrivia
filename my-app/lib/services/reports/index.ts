@@ -7,12 +7,14 @@ import "server-only";
 
 export {
   getBatchReport,
+  getOrgReport,
   getPrincipleReport,
   getQuestionReport,
   getTopicReport,
   listBatchReportSummaries,
   type BatchReport,
   type BatchReportSummary,
+  type OrgReport,
   type PrincipleReport,
   type QuestionReport,
   type QuestionStatRow,
