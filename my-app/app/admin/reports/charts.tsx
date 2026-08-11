@@ -79,6 +79,54 @@ export function RateDonut({
   );
 }
 
+/**
+ * One donut, or two side by side with a label over each — the pod-vs-project
+ * comparison every rate donut on these screens now needs. A single item
+ * renders exactly as `RateDonut` always did (no label — there's nothing to
+ * distinguish it from), so pages with no pod to show are unaffected.
+ */
+export function RateDonutRow({
+  items,
+}: {
+  items: { label: string; correct: number; total: number; caption: string }[];
+}) {
+  if (items.length <= 1) {
+    return items[0] ? <RateDonut {...items[0]} /> : null;
+  }
+
+  // Item 0 is always the project; everything after it is a pod slice.
+  // The pod gets the violet card so the separation reads at a glance —
+  // violet = your pod, plain = the project — the same code every report
+  // surface uses (score bars mark their pod line in violet too).
+  return (
+    <div className="flex flex-wrap items-start gap-5">
+      {items.map((item, index) => (
+        <div
+          key={item.label}
+          className={`flex flex-col items-center gap-1.5 ${
+            index > 0
+              ? "rounded-[10px] border border-violet-line-2 bg-violet-tint px-4 py-2.5"
+              : "px-4 py-2.5"
+          }`}
+        >
+          <span
+            className={`text-[11px] tracking-[0.04em] ${
+              index > 0 ? "font-medium text-violet-ink" : "text-faint"
+            }`}
+          >
+            {item.label.toUpperCase()}
+          </span>
+          <RateDonut
+            correct={item.correct}
+            total={item.total}
+            caption={item.caption}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Answers per day — the engagement line. */
 export function ActivityChart({ points }: { points: DayCount[] }) {
   const data = points.map((p) => ({

@@ -2,10 +2,11 @@ import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getTopicReport } from "@/lib/services/reports";
 
-import { RateDonut } from "../../reports/charts";
+import { RateDonutRow } from "../../reports/charts";
 import {
   HeaderLink,
   LinkChips,
+  PodBreakdownList,
   QuestionStatTable,
 } from "../../reports/report-bits";
 
@@ -78,20 +79,55 @@ export default async function TopicReportPage({
             </p>
           ) : (
             <div className="self-start">
-              <RateDonut
-                correct={report.correct}
-                total={report.total}
-                caption={`${report.correct} of ${report.total} correct`}
+              <RateDonutRow
+                items={[
+                  {
+                    label: "Project",
+                    correct: report.correct,
+                    total: report.total,
+                    caption: `${report.correct} of ${report.total} correct`,
+                  },
+                  ...(report.pod && report.pod.total > 0
+                    ? [
+                        {
+                          label: report.pod.label,
+                          correct: report.pod.correct,
+                          total: report.pod.total,
+                          caption: `${report.pod.correct} of ${report.pod.total} correct`,
+                        },
+                      ]
+                    : []),
+                ]}
               />
             </div>
           )}
+          {report.pod && report.pod.responseCount === 0 && (
+            <p className="text-[12px] text-muted-3">No pod answers yet.</p>
+          )}
         </section>
+
+        {report.podBreakdown && (
+          <section className="flex flex-col gap-1.5">
+            <h2 className="text-[12px] tracking-[0.04em] text-faint">
+              BY POD
+            </h2>
+            <PodBreakdownList rows={report.podBreakdown} />
+          </section>
+        )}
 
         <section className="flex flex-col gap-2.5">
           <h2 className="text-[12px] tracking-[0.04em] text-faint">
             BY QUESTION
           </h2>
-          <QuestionStatTable rows={report.questions} />
+          <QuestionStatTable
+            rows={report.questions}
+            podRows={
+              report.pod && report.pod.responseCount > 0
+                ? report.pod.questions
+                : undefined
+            }
+            podLabel={report.pod?.label}
+          />
         </section>
       </div>
     </>

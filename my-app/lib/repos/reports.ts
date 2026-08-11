@@ -128,11 +128,22 @@ export type ReportResponseRow = {
   id: string;
   questionId: string;
   participantId: string;
+  /** Pod attribution, signal 1: the link the answer came through, or null
+   * for the canonical token / a live session. */
+  batchLinkId: string | null;
+  /** Pod attribution, signal 2: the async batch this answer belongs to (or
+   * null for a live answer) — a lead's OWN custom batch attributes by this,
+   * with no link involved. */
+  batchId: string | null;
+  /** Pod attribution, signal 3: the live session this answer belongs to (or
+   * null for an async answer) — attributes to whoever hosted it. */
+  liveSessionId: string | null;
   answer: Answer;
   createdAt: string;
 };
 
-const RESPONSE_COLUMNS = "id, question_id, participant_id, answer, created_at";
+const RESPONSE_COLUMNS =
+  "id, question_id, participant_id, batch_link_id, batch_id, live_session_id, answer, created_at";
 
 /**
  * Every response recorded against this batch, async AND live: `batch_id =
@@ -267,6 +278,9 @@ function mapResponse(row: {
   id: string;
   question_id: string;
   participant_id: string;
+  batch_link_id: string | null;
+  batch_id: string | null;
+  live_session_id: string | null;
   answer: unknown;
   created_at: string;
 }): ReportResponseRow {
@@ -274,12 +288,45 @@ function mapResponse(row: {
     id: row.id,
     questionId: row.question_id,
     participantId: row.participant_id,
+    batchLinkId: row.batch_link_id,
+    batchId: row.batch_id,
+    liveSessionId: row.live_session_id,
     answer: parseJsonb(answerSchema, row.answer, {
       id: row.id,
       column: "answer",
     }),
     createdAt: row.created_at,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Pod attribution lookups — the other two signals (batch ownership,
+ * session hosting) alongside `batch_links` (already read via
+ * `lib/repos/batch-links.ts#listAll`). Both are small, whole-table reads,
+ * same shape as `listBatchesWithResponseCounts`'s bulk pulls above; the
+ * report reads that need this span every batch/session, not just one.
+ * ------------------------------------------------------------------ */
+
+export type BatchOwnerRow = { id: string; ownerId: string | null };
+
+/** Every batch's owner — a lead's own custom batch attributes to its pod
+ * this way, with no link involved. */
+export async function listBatchOwners(): Promise<BatchOwnerRow[]> {
+  const rows = unwrap(
+    await serviceClient().from("batches").select("id, owner_id"),
+  );
+  return rows.map((row) => ({ id: row.id, ownerId: row.owner_id }));
+}
+
+export type SessionHostRow = { id: string; hostId: string | null };
+
+/** Every live session's host — a live answer attributes to whoever ran the
+ * room. */
+export async function listSessionHosts(): Promise<SessionHostRow[]> {
+  const rows = unwrap(
+    await serviceClient().from("live_sessions").select("id, host_id"),
+  );
+  return rows.map((row) => ({ id: row.id, hostId: row.host_id }));
 }
 
 /* ------------------------------------------------------------------ *

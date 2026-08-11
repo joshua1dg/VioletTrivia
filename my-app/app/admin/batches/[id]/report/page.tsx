@@ -3,11 +3,16 @@ import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
-import { getBatchReport } from "@/lib/services/reports";
+import { getBatchReport, listPodOptions } from "@/lib/services/reports";
 
-import { ActivityChart, RateDonut } from "../../../reports/charts";
-import { HeaderLink, QuestionStatTable } from "../../../reports/report-bits";
-import { ScoreBar } from "../../../reports/score-bar";
+import { ActivityChart, RateDonutRow } from "../../../reports/charts";
+import {
+  HeaderLink,
+  PodBreakdownList,
+  PodSelector,
+  QuestionStatTable,
+} from "../../../reports/report-bits";
+import { ScoreBarPair } from "../../../reports/score-bar";
 
 /**
  * The batch's dashboard, at home in the batches section (2026-08-11: a
@@ -19,14 +24,23 @@ import { ScoreBar } from "../../../reports/score-bar";
  * Numbers are BATCH-scoped: only answers given through this batch (async
  * via its link, or live sessions run off it), deduped to first answers.
  * The per-question rows click through to each question's ORG-WIDE report.
+ *
+ * Wave 1 (PODS.md): same pod-vs-project comparison as the org dashboard,
+ * scoped to just this batch's answers.
  */
 export default async function BatchReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ pod?: string }>;
 }) {
   const { id } = await params;
-  const report = await getBatchReport(id);
+  const query = await searchParams;
+  const [report, podOptions] = await Promise.all([
+    getBatchReport(id, query.pod),
+    listPodOptions(),
+  ]);
 
   return (
     <>
@@ -46,6 +60,14 @@ export default async function BatchReportPage({
       <div className="flex flex-col gap-6 p-6">
         <SkippedRowsBanner skipped={report.skipped} />
 
+        {report.viewerPodScope === null && (
+          <PodSelector
+            options={podOptions}
+            activePodId={report.pod?.podId ?? null}
+            basePath={`/admin/batches/${report.batch.id}/report`}
+          />
+        )}
+
         {report.duplicateCount > 0 && (
           <p className="text-[12.5px] text-muted-3">
             {report.duplicateCount} repeat answer
@@ -56,14 +78,38 @@ export default async function BatchReportPage({
         )}
 
         <div className="flex flex-wrap gap-6">
-          {report.total > 0 && (
+          {(report.total > 0 || (report.pod && report.pod.total > 0)) && (
             <Section title="Overall">
               <div className="px-4 py-3">
-                <RateDonut
-                  correct={report.correct}
-                  total={report.total}
-                  caption={`${report.correct} of ${report.total} correct`}
+                <RateDonutRow
+                  items={[
+                    ...(report.total > 0
+                      ? [
+                          {
+                            label: "Project",
+                            correct: report.correct,
+                            total: report.total,
+                            caption: `${report.correct} of ${report.total} correct`,
+                          },
+                        ]
+                      : []),
+                    ...(report.pod && report.pod.total > 0
+                      ? [
+                          {
+                            label: report.pod.label,
+                            correct: report.pod.correct,
+                            total: report.pod.total,
+                            caption: `${report.pod.correct} of ${report.pod.total} correct`,
+                          },
+                        ]
+                      : []),
+                  ]}
                 />
+                {report.pod && report.pod.responseCount === 0 && (
+                  <p className="mt-2 text-[12px] text-muted-3">
+                    No pod answers yet.
+                  </p>
+                )}
               </div>
             </Section>
           )}
@@ -78,6 +124,19 @@ export default async function BatchReportPage({
           )}
         </div>
 
+        {report.podBreakdown && (
+          <Section title="By pod">
+            <PodBreakdownList
+              rows={report.podBreakdown}
+              basePath={`/admin/batches/${report.batch.id}/report`}
+            />
+            <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
+              Each pod&rsquo;s slice of this batch&rsquo;s answers, best rate
+              first — click a pod for its full breakdown.
+            </p>
+          </Section>
+        )}
+
         <Section title="By rubric code">
           {report.rubric.length === 0 ? (
             <p className="text-[13px] text-muted-3">
@@ -88,23 +147,36 @@ export default async function BatchReportPage({
               <div className="flex flex-col">
                 {/* Each bar links to the code's own report — every fact on
                     a report is a door (2026-08-11). */}
-                {report.rubric.map((row) => (
-                  <Link
-                    key={row.code}
-                    href={`/admin/principles/${row.code}`}
-                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
-                  >
-                    <ScoreBar
-                      label={`${row.code} — ${row.name}`}
-                      correct={row.correct}
-                      total={row.total}
-                      note={
-                        row.mostPickedWrong &&
-                        `most-picked wrong: ${row.mostPickedWrong.code}`
-                      }
-                    />
-                  </Link>
-                ))}
+                {report.rubric.map((row) => {
+                  const podRow = report.pod?.rubric.find(
+                    (r) => r.code === row.code,
+                  );
+                  return (
+                    <Link
+                      key={row.code}
+                      href={`/admin/principles/${row.code}`}
+                      className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                    >
+                      <ScoreBarPair
+                        label={`${row.code} — ${row.name}`}
+                        project={{ correct: row.correct, total: row.total }}
+                        pod={
+                          podRow && report.pod
+                            ? {
+                                label: report.pod.label,
+                                correct: podRow.correct,
+                                total: podRow.total,
+                              }
+                            : null
+                        }
+                        note={
+                          row.mostPickedWrong &&
+                          `most-picked wrong: ${row.mostPickedWrong.code}`
+                        }
+                      />
+                    </Link>
+                  );
+                })}
               </div>
               <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
                 A code&rsquo;s bar counts only the questions it was the
@@ -123,19 +195,32 @@ export default async function BatchReportPage({
           ) : (
             <>
               <div className="flex flex-col">
-                {report.topics.map((row) => (
-                  <Link
-                    key={row.slug}
-                    href={`/admin/topics/${row.slug}`}
-                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
-                  >
-                    <ScoreBar
-                      label={row.label}
-                      correct={row.correct}
-                      total={row.total}
-                    />
-                  </Link>
-                ))}
+                {report.topics.map((row) => {
+                  const podRow = report.pod?.topics.find(
+                    (t) => t.slug === row.slug,
+                  );
+                  return (
+                    <Link
+                      key={row.slug}
+                      href={`/admin/topics/${row.slug}`}
+                      className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                    >
+                      <ScoreBarPair
+                        label={row.label}
+                        project={{ correct: row.correct, total: row.total }}
+                        pod={
+                          podRow && report.pod
+                            ? {
+                                label: report.pod.label,
+                                correct: podRow.correct,
+                                total: podRow.total,
+                              }
+                            : null
+                        }
+                      />
+                    </Link>
+                  );
+                })}
               </div>
               <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
                 Includes rank_variants responses, graded exact-match. A low

@@ -3,10 +3,11 @@ import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/admin/ui";
 import { EmptyState, SkippedRowsBanner } from "@/components/feedback";
-import { getOrgReport } from "@/lib/services/reports";
+import { getOrgReport, listPodOptions } from "@/lib/services/reports";
 
-import { ActivityChart, RateDonut } from "./charts";
-import { ScoreBar } from "./score-bar";
+import { ActivityChart, RateDonutRow } from "./charts";
+import { PodBreakdownList, PodSelector } from "./report-bits";
+import { ScoreBarPair } from "./score-bar";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
@@ -20,9 +21,21 @@ const STATUS_LABEL: Record<string, string> = {
  * what was missing was the unscoped view: where is the team miscalibrated
  * across everything. Every bar, chip and row below links into the entity
  * reports, same as everywhere else.
+ *
+ * Wave 1 (PODS.md): a pod lead's slice renders beside these project-wide
+ * numbers automatically; a project lead/admin picks a pod via `?pod=` and
+ * sees the exact same comparison.
  */
-export default async function OrgReportPage() {
-  const report = await getOrgReport();
+export default async function OrgReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pod?: string }>;
+}) {
+  const params = await searchParams;
+  const [report, podOptions] = await Promise.all([
+    getOrgReport(params.pod),
+    listPodOptions(),
+  ]);
 
   if (report.responseCount === 0) {
     return (
@@ -52,6 +65,14 @@ export default async function OrgReportPage() {
       <div className="flex flex-col gap-6 p-6">
         <SkippedRowsBanner skipped={report.skipped} />
 
+        {report.viewerPodScope === null && (
+          <PodSelector
+            options={podOptions}
+            activePodId={report.pod?.podId ?? null}
+            basePath="/admin/reports"
+          />
+        )}
+
         {report.duplicateCount > 0 && (
           <p className="text-[12.5px] text-muted-3">
             {report.duplicateCount} repeat answer
@@ -62,14 +83,38 @@ export default async function OrgReportPage() {
         )}
 
         <div className="flex flex-wrap gap-6">
-          {report.total > 0 && (
+          {(report.total > 0 || (report.pod && report.pod.total > 0)) && (
             <Section title="Overall">
               <div className="px-4 py-3">
-                <RateDonut
-                  correct={report.correct}
-                  total={report.total}
-                  caption={`${report.correct} of ${report.total} correct`}
+                <RateDonutRow
+                  items={[
+                    ...(report.total > 0
+                      ? [
+                          {
+                            label: "Project",
+                            correct: report.correct,
+                            total: report.total,
+                            caption: `${report.correct} of ${report.total} correct`,
+                          },
+                        ]
+                      : []),
+                    ...(report.pod && report.pod.total > 0
+                      ? [
+                          {
+                            label: report.pod.label,
+                            correct: report.pod.correct,
+                            total: report.pod.total,
+                            caption: `${report.pod.correct} of ${report.pod.total} correct`,
+                          },
+                        ]
+                      : []),
+                  ]}
                 />
+                {report.pod && report.pod.responseCount === 0 && (
+                  <p className="mt-2 text-[12px] text-muted-3">
+                    No pod answers yet.
+                  </p>
+                )}
               </div>
             </Section>
           )}
@@ -84,6 +129,19 @@ export default async function OrgReportPage() {
           )}
         </div>
 
+        {report.podBreakdown && (
+          <Section title="By pod">
+            <PodBreakdownList
+              rows={report.podBreakdown}
+              basePath="/admin/reports"
+            />
+            <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
+              Each pod&rsquo;s slice of the same answers, best rate first —
+              click a pod for its full breakdown.
+            </p>
+          </Section>
+        )}
+
         <Section title="By rubric code">
           {report.rubric.length === 0 ? (
             <p className="text-[13px] text-muted-3">
@@ -92,23 +150,36 @@ export default async function OrgReportPage() {
           ) : (
             <>
               <div className="flex flex-col">
-                {report.rubric.map((row) => (
-                  <Link
-                    key={row.code}
-                    href={`/admin/principles/${row.code}`}
-                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
-                  >
-                    <ScoreBar
-                      label={`${row.code} — ${row.name}`}
-                      correct={row.correct}
-                      total={row.total}
-                      note={
-                        row.mostPickedWrong &&
-                        `most-picked wrong: ${row.mostPickedWrong.code}`
-                      }
-                    />
-                  </Link>
-                ))}
+                {report.rubric.map((row) => {
+                  const podRow = report.pod?.rubric.find(
+                    (r) => r.code === row.code,
+                  );
+                  return (
+                    <Link
+                      key={row.code}
+                      href={`/admin/principles/${row.code}`}
+                      className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                    >
+                      <ScoreBarPair
+                        label={`${row.code} — ${row.name}`}
+                        project={{ correct: row.correct, total: row.total }}
+                        pod={
+                          podRow && report.pod
+                            ? {
+                                label: report.pod.label,
+                                correct: podRow.correct,
+                                total: podRow.total,
+                              }
+                            : null
+                        }
+                        note={
+                          row.mostPickedWrong &&
+                          `most-picked wrong: ${row.mostPickedWrong.code}`
+                        }
+                      />
+                    </Link>
+                  );
+                })}
               </div>
               <p className="mt-1 text-[12px] leading-[1.5] text-muted-3">
                 A code&rsquo;s bar counts only the questions it was the
@@ -125,19 +196,32 @@ export default async function OrgReportPage() {
             </p>
           ) : (
             <div className="flex flex-col">
-              {report.topics.map((row) => (
-                <Link
-                  key={row.slug}
-                  href={`/admin/topics/${row.slug}`}
-                  className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
-                >
-                  <ScoreBar
-                    label={row.label}
-                    correct={row.correct}
-                    total={row.total}
-                  />
-                </Link>
-              ))}
+              {report.topics.map((row) => {
+                const podRow = report.pod?.topics.find(
+                  (t) => t.slug === row.slug,
+                );
+                return (
+                  <Link
+                    key={row.slug}
+                    href={`/admin/topics/${row.slug}`}
+                    className="-mx-2 rounded-[8px] px-2 transition-colors hover:bg-surface"
+                  >
+                    <ScoreBarPair
+                      label={row.label}
+                      project={{ correct: row.correct, total: row.total }}
+                      pod={
+                        podRow && report.pod
+                          ? {
+                              label: report.pod.label,
+                              correct: podRow.correct,
+                              total: podRow.total,
+                            }
+                          : null
+                      }
+                    />
+                  </Link>
+                );
+              })}
             </div>
           )}
         </Section>

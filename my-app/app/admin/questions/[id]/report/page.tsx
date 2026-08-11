@@ -3,8 +3,13 @@ import { SkippedRowsBanner } from "@/components/feedback";
 import { getQuestionReport } from "@/lib/services/reports";
 import { registry } from "@/lib/templates/registry";
 
-import { RateDonut, SharePie } from "../../../reports/charts";
-import { HeaderLink, LinkChips, TallyBars } from "../../../reports/report-bits";
+import { RateDonutRow, SharePie } from "../../../reports/charts";
+import {
+  HeaderLink,
+  LinkChips,
+  PodBreakdownList,
+  TallyBars,
+} from "../../../reports/report-bits";
 
 /**
  * The question's dashboard — what clicking a question row means now
@@ -89,16 +94,40 @@ export default async function QuestionReportPage({
         </div>
 
         <div className="flex flex-wrap items-start gap-10">
-          {report.total > 0 && (
+          {(report.total > 0 || (report.pod && report.pod.total > 0)) && (
             <section className="flex flex-col gap-1.5">
               <h2 className="text-[12px] tracking-[0.04em] text-faint">
                 CORRECT RATE
               </h2>
-              <RateDonut
-                correct={report.correct}
-                total={report.total}
-                caption={`${report.correct} of ${report.total} correct`}
+              <RateDonutRow
+                items={[
+                  ...(report.total > 0
+                    ? [
+                        {
+                          label: "Project",
+                          correct: report.correct,
+                          total: report.total,
+                          caption: `${report.correct} of ${report.total} correct`,
+                        },
+                      ]
+                    : []),
+                  ...(report.pod && report.pod.total > 0
+                    ? [
+                        {
+                          label: report.pod.label,
+                          correct: report.pod.correct,
+                          total: report.pod.total,
+                          caption: `${report.pod.correct} of ${report.pod.total} correct`,
+                        },
+                      ]
+                    : []),
+                ]}
               />
+              {report.pod && report.pod.responseCount === 0 && (
+                <p className="text-[12px] text-muted-3">
+                  No pod answers yet.
+                </p>
+              )}
             </section>
           )}
 
@@ -122,6 +151,15 @@ export default async function QuestionReportPage({
             )}
           </section>
         </div>
+
+        {report.podBreakdown && (
+          <section className="flex flex-col gap-1.5">
+            <h2 className="text-[12px] tracking-[0.04em] text-faint">
+              BY POD
+            </h2>
+            <PodBreakdownList rows={report.podBreakdown} />
+          </section>
+        )}
 
         {report.feedback.length > 0 && (
           <section className="flex flex-col gap-2.5">
