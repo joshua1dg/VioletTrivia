@@ -61,6 +61,26 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
 
   if (!data.user) {
+    // DEV ONLY: sign in as the seeded admin instead of bouncing to /login,
+    // so `supabase db reset` never costs a login — the seed recreates the
+    // account (supabase/seed.sql) and the next staff request lands here and
+    // silently re-establishes the session. `next dev` is the only runtime
+    // where NODE_ENV is "development"; a production build — even `next
+    // start` on this machine — keeps the login form. The credentials are
+    // the ones already public in seed.sql, so this hardcodes nothing new.
+    // If the sign-in fails (no seeded account — e.g. real data), fall
+    // through to /login as before.
+    // NODE_ENV is set by Next itself, not by us: `next dev` → "development"
+    // (always the full word), `next build`/`next start` → "production".
+    // Nothing to configure in .env.local — Next ignores NODE_ENV there.
+    if (process.env.NODE_ENV === "development") {
+      const seeded = await supabase.auth.signInWithPassword({
+        email: "admin@violet.local",
+        password: "password",
+      });
+      if (!seeded.error) return response;
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
