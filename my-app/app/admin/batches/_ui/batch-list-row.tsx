@@ -16,9 +16,13 @@ const STATUS_TONE: Record<BatchWithCounts["status"], string> = {
 
 export function BatchListRow({ batch }: { batch: BatchWithCounts }) {
   return (
-    <div className="grid grid-cols-[1fr_90px_100px_100px_140px_1fr] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface">
+    <div className="grid grid-cols-[1fr_90px_100px_100px_140px_1fr_56px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface">
+      {/* The name goes to the batch's REPORT — inside the batches section,
+          same shape as every other entity; the composer is behind the
+          explicit Edit button (2026-08-11: "clicking into it is looking at
+          the statistics"). */}
       <Link
-        href={`/admin/batches/${batch.id}`}
+        href={`/admin/batches/${batch.id}/report`}
         className="truncate pr-4 text-[13.5px] text-ink-3 hover:underline"
       >
         {batch.name}
@@ -40,6 +44,12 @@ export function BatchListRow({ batch }: { batch: BatchWithCounts }) {
         )}
       </span>
       <CopyLinkButton token={batch.token} />
+      <Link
+        href={`/admin/batches/${batch.id}`}
+        className="justify-self-end rounded-[6px] border border-line px-2 py-1 text-[12px] text-ink-4 transition-colors hover:bg-white"
+      >
+        Edit
+      </Link>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { PageHeader } from "@/components/admin/ui";
 import { listPrinciplesWithUsage } from "@/lib/services/principles";
 
@@ -39,12 +41,16 @@ export default async function PrinciplesPage() {
           {principles.map((p) => {
             const blank = !p.name || !p.shortDescriptor;
             return (
-              <div
+              // The card clicks through to the code's report (2026-08-11:
+              // "everything goes to a report"); the rubric itself stays
+              // read-only, so there is no edit affordance to make room for.
+              <Link
                 key={p.code}
-                className={`flex gap-4 rounded-[10px] border p-4 ${
+                href={`/admin/principles/${p.code}`}
+                className={`flex gap-4 rounded-[10px] border p-4 transition-colors ${
                   blank
-                    ? "border-dashed border-line-4 bg-surface"
-                    : "border-line bg-white"
+                    ? "border-dashed border-line-4 bg-surface hover:border-line"
+                    : "border-line bg-white hover:border-faint-2"
                 }`}
               >
                 <span className="w-8 shrink-0 pt-0.5 font-mono text-[12px] text-violet-ink">
@@ -81,7 +87,7 @@ export default async function PrinciplesPage() {
                 <span className="shrink-0 self-start text-[12.5px] whitespace-nowrap text-muted-3">
                   {p.questionCount} question{p.questionCount === 1 ? "" : "s"}
                 </span>
-              </div>
+              </Link>
             );
           })}
         </div>

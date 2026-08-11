@@ -7,9 +7,16 @@ import "server-only";
 
 export {
   getBatchReport,
+  getPrincipleReport,
+  getQuestionReport,
+  getTopicReport,
   listBatchReportSummaries,
   type BatchReport,
   type BatchReportSummary,
+  type PrincipleReport,
+  type QuestionReport,
+  type QuestionStatRow,
+  type TopicReport,
 } from "./reports.service";
 
 export type { ExcludedQuestion } from "./exclusion.util";

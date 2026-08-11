@@ -92,21 +92,26 @@ export function QuestionLibrary({
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_180px_140px_150px_96px_84px] gap-0 border-b border-line-2 px-6 py-2.5 text-[11.5px] tracking-[0.04em] text-faint">
+      <div className="grid grid-cols-[1fr_180px_140px_150px_96px_84px_56px] gap-0 border-b border-line-2 px-6 py-2.5 text-[11.5px] tracking-[0.04em] text-faint">
         <span>EXCERPT</span>
         <span>TOPIC</span>
         <span>TYPE</span>
         <span>PRINCIPLES</span>
         <span>RESPONSES</span>
         <span>STATUS</span>
+        <span />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {visible.map((q) => (
-          <Link
+          // The row goes to the question's REPORT; editing is the explicit
+          // button (2026-08-11: "everything goes to a report"). A stretched
+          // overlay link rather than wrapping the row in <Link>, because an
+          // Edit <a> nested inside a row <a> is invalid HTML — the overlay
+          // covers the row and the Edit link sits above it on z-index.
+          <div
             key={q.id}
-            href={`/admin/questions/${q.id}`}
-            className="grid grid-cols-[1fr_180px_140px_150px_96px_84px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface"
+            className="relative grid grid-cols-[1fr_180px_140px_150px_96px_84px_56px] items-center gap-0 border-b border-line-3 px-6 py-3.5 transition-colors hover:bg-surface"
           >
             <span className="truncate pr-5 text-[13.5px] text-ink-3">
               {q.excerpt}
@@ -128,7 +133,18 @@ export function QuestionLibrary({
               {q.responseCount}
             </span>
             <StatusPill status={q.status} />
-          </Link>
+            <Link
+              href={`/admin/questions/${q.id}/report`}
+              aria-label={`Report for: ${q.excerpt}`}
+              className="absolute inset-0"
+            />
+            <Link
+              href={`/admin/questions/${q.id}`}
+              className="relative z-10 justify-self-end rounded-[6px] border border-line px-2 py-1 text-[12px] text-ink-4 transition-colors hover:bg-white"
+            >
+              Edit
+            </Link>
+          </div>
         ))}
 
         {visible.length === 0 && (

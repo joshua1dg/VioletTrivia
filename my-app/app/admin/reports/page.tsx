@@ -43,7 +43,7 @@ export default async function ReportsPage() {
             {batches.map((batch) => (
               <Link
                 key={batch.id}
-                href={`/admin/reports/${batch.id}`}
+                href={`/admin/batches/${batch.id}/report`}
                 className="grid grid-cols-[1fr_120px_140px] items-center gap-0 border-b border-line-3 px-4 py-3 text-[13.5px] text-ink-3 transition-colors last:border-b-0 hover:bg-surface"
               >
                 <span className="truncate">{batch.name}</span>

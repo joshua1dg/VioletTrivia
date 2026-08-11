@@ -208,18 +208,18 @@ function TopicRow({
 
   return (
     <div className="grid grid-cols-[1fr_200px_100px_120px_auto] items-center gap-2 border-b border-line-3 px-4 py-3 transition-colors last:border-b-0 hover:bg-surface">
-      {/* The label IS the way into the topic: the questions library,
-          pre-filtered to it. Rename/delete stay as the explicit buttons on
-          the right, so the row's one click target does the obvious thing. */}
+      {/* The label IS the way into the topic — its REPORT (2026-08-11:
+          "everything goes to a report"). The filtered library sits behind
+          the explicit Questions button beside Rename. */}
       <Link
-        href={`/admin/questions?topic=${topic.slug}`}
+        href={`/admin/topics/${topic.slug}`}
         className="text-[13.5px] text-ink-3 transition-colors hover:text-violet-ink hover:underline"
       >
         {topic.label}
       </Link>
       <span className="font-mono text-[12.5px] text-muted-2">{topic.slug}</span>
       <Link
-        href={`/admin/questions?topic=${topic.slug}`}
+        href={`/admin/topics/${topic.slug}`}
         className="text-[12.5px] text-muted-2 tabular-nums transition-colors hover:text-violet-ink hover:underline"
       >
         {topic.questionCount}
@@ -246,6 +246,12 @@ function TopicRow({
         >
           ↓
         </button>
+        <Link
+          href={`/admin/questions?topic=${topic.slug}`}
+          className="rounded-[6px] border border-line px-2.5 py-1 text-[12px] text-ink-4 transition-colors hover:bg-surface"
+        >
+          Questions
+        </Link>
         <GhostButton onClick={() => setEditing(true)}>Rename</GhostButton>
         <ConfirmDelete
           triggerLabel="Delete"

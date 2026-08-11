@@ -181,6 +181,55 @@ export async function listResponsesForBatch(
   return collect(deduped, (r) => r.id, mapResponse);
 }
 
+/**
+ * Every response to these questions, org-wide — async in ANY batch plus any
+ * live session. The question-centric reads (question / topic / principle
+ * reports) use this; the batch report keeps its scoped read above. Oldest
+ * first for the same reason as above: first answer wins the dedupe.
+ */
+export async function listResponsesForQuestions(
+  questionIds: string[],
+): Promise<ListResult<ReportResponseRow>> {
+  if (questionIds.length === 0) return { rows: [], skipped: [] };
+
+  const rows = unwrap(
+    await serviceClient()
+      .from("responses")
+      .select(RESPONSE_COLUMNS)
+      .in("question_id", questionIds)
+      .order("created_at", { ascending: true }),
+  );
+
+  return collect(rows, (r) => r.id, mapResponse);
+}
+
+/** Question ids tagged with a topic — the topic report's scope. */
+export async function listQuestionIdsForTopic(
+  topicId: string,
+): Promise<string[]> {
+  const rows = unwrap(
+    await serviceClient()
+      .from("question_topics")
+      .select("question_id")
+      .eq("topic_id", topicId),
+  );
+  return rows.map((row) => row.question_id);
+}
+
+/** Question ids linked to a principle (in play) — the principle report's
+ *  candidate set; the service narrows to key-coded ones itself. */
+export async function listQuestionIdsForPrinciple(
+  principleId: string,
+): Promise<string[]> {
+  const rows = unwrap(
+    await serviceClient()
+      .from("question_principles")
+      .select("question_id")
+      .eq("principle_id", principleId),
+  );
+  return rows.map((row) => row.question_id);
+}
+
 function mapResponse(row: {
   id: string;
   question_id: string;

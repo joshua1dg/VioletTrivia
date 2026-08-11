@@ -17,13 +17,14 @@ export default async function BatchesPage() {
       />
 
       <div className="flex flex-col">
-        <div className="grid grid-cols-[1fr_90px_100px_100px_140px_1fr] gap-0 border-b border-line-2 px-6 py-2.5 text-[11.5px] tracking-[0.04em] text-faint">
+        <div className="grid grid-cols-[1fr_90px_100px_100px_140px_1fr_56px] gap-0 border-b border-line-2 px-6 py-2.5 text-[11.5px] tracking-[0.04em] text-faint">
           <span>NAME</span>
           <span>STATUS</span>
           <span>QUESTIONS</span>
           <span>RESPONSES</span>
           <span>ASYNC POOL</span>
           <span>LINK</span>
+          <span />
         </div>
 
         {rows.map((batch) => (
