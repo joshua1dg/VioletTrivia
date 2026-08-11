@@ -4,12 +4,12 @@ import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getPrincipleReport } from "@/lib/services/reports";
 
+import { RateDonut } from "../../reports/charts";
 import {
   HeaderLink,
   LinkChips,
   QuestionStatTable,
 } from "../../reports/report-bits";
-import { ScoreBar } from "../../reports/score-bar";
 
 /**
  * The rubric code's dashboard — what clicking a principle row means now
@@ -64,11 +64,13 @@ export default async function PrincipleReportPage({
               No answers yet to questions keyed to {p.code}.
             </p>
           ) : (
-            <ScoreBar
-              label={`${report.participantCount} participant${report.participantCount === 1 ? "" : "s"}`}
-              correct={report.correct}
-              total={report.total}
-            />
+            <div className="self-start">
+              <RateDonut
+                correct={report.correct}
+                total={report.total}
+                caption={`${report.correct} of ${report.total} found · ${report.participantCount} participant${report.participantCount === 1 ? "" : "s"}`}
+              />
+            </div>
           )}
           {report.duplicateCount > 0 && (
             <p className="text-[12px] text-muted-3">

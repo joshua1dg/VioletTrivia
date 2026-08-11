@@ -14,6 +14,7 @@ export {
   listBatchReportSummaries,
   type BatchReport,
   type BatchReportSummary,
+  type DayCount,
   type OrgReport,
   type PrincipleReport,
   type QuestionReport,

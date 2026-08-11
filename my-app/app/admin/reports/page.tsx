@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/admin/ui";
 import { EmptyState, SkippedRowsBanner } from "@/components/feedback";
 import { getOrgReport } from "@/lib/services/reports";
 
+import { ActivityChart, RateDonut } from "./charts";
 import { ScoreBar } from "./score-bar";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,15 +61,28 @@ export default async function OrgReportPage() {
           </p>
         )}
 
-        {report.total > 0 && (
-          <Section title="Overall">
-            <ScoreBar
-              label="All gradeable answers"
-              correct={report.correct}
-              total={report.total}
-            />
-          </Section>
-        )}
+        <div className="flex flex-wrap gap-6">
+          {report.total > 0 && (
+            <Section title="Overall">
+              <div className="px-4 py-3">
+                <RateDonut
+                  correct={report.correct}
+                  total={report.total}
+                  caption={`${report.correct} of ${report.total} correct`}
+                />
+              </div>
+            </Section>
+          )}
+          {report.activity.length > 0 && (
+            <div className="min-w-64 flex-1">
+              <Section title="Answers per day">
+                <div className="py-2">
+                  <ActivityChart points={report.activity} />
+                </div>
+              </Section>
+            </div>
+          )}
+        </div>
 
         <Section title="By rubric code">
           {report.rubric.length === 0 ? (

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getBatchReport } from "@/lib/services/reports";
 
+import { ActivityChart, RateDonut } from "../../../reports/charts";
 import { HeaderLink, QuestionStatTable } from "../../../reports/report-bits";
 import { ScoreBar } from "../../../reports/score-bar";
 
@@ -53,6 +54,29 @@ export default async function BatchReportPage({
             or across sessions), only their first answer counts.
           </p>
         )}
+
+        <div className="flex flex-wrap gap-6">
+          {report.total > 0 && (
+            <Section title="Overall">
+              <div className="px-4 py-3">
+                <RateDonut
+                  correct={report.correct}
+                  total={report.total}
+                  caption={`${report.correct} of ${report.total} correct`}
+                />
+              </div>
+            </Section>
+          )}
+          {report.activity.length > 0 && (
+            <div className="min-w-64 flex-1">
+              <Section title="Answers per day">
+                <div className="py-2">
+                  <ActivityChart points={report.activity} />
+                </div>
+              </Section>
+            </div>
+          )}
+        </div>
 
         <Section title="By rubric code">
           {report.rubric.length === 0 ? (

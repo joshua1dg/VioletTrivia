@@ -3,8 +3,8 @@ import { SkippedRowsBanner } from "@/components/feedback";
 import { getQuestionReport } from "@/lib/services/reports";
 import { registry } from "@/lib/templates/registry";
 
+import { RateDonut, SharePie } from "../../../reports/charts";
 import { HeaderLink, LinkChips, TallyBars } from "../../../reports/report-bits";
-import { ScoreBar } from "../../../reports/score-bar";
 
 /**
  * The question's dashboard — what clicking a question row means now
@@ -88,33 +88,40 @@ export default async function QuestionReportPage({
           />
         </div>
 
-        {report.total > 0 && (
-          <section className="flex flex-col gap-1.5">
-            <h2 className="text-[12px] tracking-[0.04em] text-faint">
-              CORRECT RATE
-            </h2>
-            <ScoreBar
-              label="All participants"
-              correct={report.correct}
-              total={report.total}
-            />
-          </section>
-        )}
-
-        <section className="flex flex-col gap-2.5">
-          <h2 className="text-[12px] tracking-[0.04em] text-faint">
-            ANSWER DISTRIBUTION
-          </h2>
-          {report.tally === null ? (
-            <p className="text-[13px] text-muted-3">
-              Prose answers — no distribution to chart.
-            </p>
-          ) : report.responseCount === 0 ? (
-            <p className="text-[13px] text-muted-3">No answers yet.</p>
-          ) : (
-            <TallyBars groups={report.tally} />
+        <div className="flex flex-wrap items-start gap-10">
+          {report.total > 0 && (
+            <section className="flex flex-col gap-1.5">
+              <h2 className="text-[12px] tracking-[0.04em] text-faint">
+                CORRECT RATE
+              </h2>
+              <RateDonut
+                correct={report.correct}
+                total={report.total}
+                caption={`${report.correct} of ${report.total} correct`}
+              />
+            </section>
           )}
-        </section>
+
+          <section className="flex min-w-0 flex-1 flex-col gap-2.5">
+            <h2 className="text-[12px] tracking-[0.04em] text-faint">
+              ANSWER DISTRIBUTION
+            </h2>
+            {report.tally === null ? (
+              <p className="text-[13px] text-muted-3">
+                Prose answers — no distribution to chart.
+              </p>
+            ) : report.responseCount === 0 ? (
+              <p className="text-[13px] text-muted-3">No answers yet.</p>
+            ) : report.tally.length === 1 ? (
+              // One group = an option split (which_principle) — a pie says
+              // it faster than bars. Rankings keep the per-position bars;
+              // positions don't share a whole to slice.
+              <SharePie group={report.tally[0]} />
+            ) : (
+              <TallyBars groups={report.tally} />
+            )}
+          </section>
+        </div>
 
         {report.feedback.length > 0 && (
           <section className="flex flex-col gap-2.5">

@@ -2,12 +2,12 @@ import { PageHeader } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
 import { getTopicReport } from "@/lib/services/reports";
 
+import { RateDonut } from "../../reports/charts";
 import {
   HeaderLink,
   LinkChips,
   QuestionStatTable,
 } from "../../reports/report-bits";
-import { ScoreBar } from "../../reports/score-bar";
 
 /**
  * The topic's dashboard — what clicking a topic row means now (2026-08-11).
@@ -77,11 +77,13 @@ export default async function TopicReportPage({
               No gradeable answers yet.
             </p>
           ) : (
-            <ScoreBar
-              label="All questions"
-              correct={report.correct}
-              total={report.total}
-            />
+            <div className="self-start">
+              <RateDonut
+                correct={report.correct}
+                total={report.total}
+                caption={`${report.correct} of ${report.total} correct`}
+              />
+            </div>
           )}
         </section>
 

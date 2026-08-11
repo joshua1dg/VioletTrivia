@@ -59,6 +59,11 @@ export type BatchReport = {
   batch: { id: string; name: string; status: BatchStatus };
   participantCount: number;
   questionCount: number;
+  /** Correct out of gradeable, whole batch — the headline donut. */
+  correct: number;
+  total: number;
+  /** Answers per day (RAW response counts — activity, so repeats count). */
+  activity: DayCount[];
   rubric: RubricRow[];
   topics: TopicRow[];
   /** Per-question stats — BATCH-scoped, unlike the entity reports'
@@ -104,6 +109,7 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
   const firstAnswers = dedupeToFirstAnswer(responses.rows);
 
   const graded = gradeResponses(firstAnswers.rows, questionsById);
+  const gradeable = graded.filter((g) => g.grade !== null);
   const participantCount = new Set(
     firstAnswers.rows.map((response) => response.participantId),
   ).size;
@@ -112,6 +118,9 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
     batch: { id: batch.id, name: batch.name, status: batch.status },
     participantCount,
     questionCount: questionIds.length,
+    correct: gradeable.filter((g) => g.grade === 1).length,
+    total: gradeable.length,
+    activity: dailyCounts(responses.rows.map((row) => row.createdAt)),
     rubric: buildRubricRows(graded, principleLinks),
     topics: buildTopicRows(graded, topicLinks),
     questions: statRows(questionsResult.rows, graded),
@@ -121,10 +130,15 @@ export async function getBatchReport(batchId: string): Promise<BatchReport> {
   };
 }
 
+/** One point of the activity chart: a UTC day and its raw answer count. */
+export type DayCount = { day: string; count: number };
+
 export type OrgReport = {
   participantCount: number;
   responseCount: number;
   duplicateCount: number;
+  /** Answers per day, org-wide (raw counts — activity, repeats included). */
+  activity: DayCount[];
   /** Questions with at least one answer / all questions. */
   answeredQuestionCount: number;
   questionCount: number;
@@ -193,6 +207,7 @@ export async function getOrgReport(): Promise<OrgReport> {
     participantCount: core.participantCount,
     responseCount: core.responseCount,
     duplicateCount: core.duplicateCount,
+    activity: dailyCounts(core.rawCreatedAts),
     answeredQuestionCount: core.questions.filter((q) => q.responseCount > 0)
       .length,
     questionCount: allIds.length,
@@ -501,6 +516,8 @@ async function loadQuestionStats(questionIds: string[]): Promise<{
   /** The parsed questions themselves, for callers that need key codes. */
   authored: AuthoredQuestion[];
   graded: GradedResponse[];
+  /** RAW response timestamps (pre-dedupe) — activity-chart material. */
+  rawCreatedAts: string[];
   skipped: SkippedRow[];
 }> {
   const [questionsResult, responses] = await Promise.all([
@@ -529,8 +546,34 @@ async function loadQuestionStats(questionIds: string[]): Promise<{
     questions,
     authored: questionsResult.rows,
     graded,
+    rawCreatedAts: responses.rows.map((row) => row.createdAt),
     skipped: mergeSkipped(questionsResult, responses),
   };
+}
+
+/**
+ * Raw timestamps → one point per UTC day, gaps filled with zeros so the
+ * chart's x-axis is a real timeline rather than only the busy days.
+ */
+function dailyCounts(createdAts: string[]): DayCount[] {
+  if (createdAts.length === 0) return [];
+
+  const counts = new Map<string, number>();
+  for (const at of createdAts) {
+    const day = at.slice(0, 10);
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+
+  const days = [...counts.keys()].sort();
+  const out: DayCount[] = [];
+  const cursor = new Date(`${days[0]}T00:00:00Z`);
+  const last = new Date(`${days[days.length - 1]}T00:00:00Z`);
+  while (cursor <= last) {
+    const day = cursor.toISOString().slice(0, 10);
+    out.push({ day, count: counts.get(day) ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
 }
 
 /** One stat row per question, folded from already-graded responses. Both
