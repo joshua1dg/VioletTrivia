@@ -1047,3 +1047,75 @@ update responses set rationale = 'Deleting 2M rows on an assumption is the check
   where participant_id = '00000000-0000-4000-a000-000000000412'
     and question_id = '00000000-0000-4000-a000-000000000212'
     and batch_id = '00000000-0000-4000-a000-000000000303';
+
+-- ---------------------------------------------------------------------
+-- Wave 1 (pod leads): two more logins, the pod lead's links on every
+-- master batch, and pod attribution for some of the fake contestants.
+--
+--   lead@violet.local    / password  — pod_lead
+--   project@violet.local / password  — project_lead
+--
+-- Participants 406–408 (Spot the miss), 409–410 (Rank and file) and
+-- 411–412 (Feedback clinic) are stamped as having come through the pod
+-- lead's links — so that lead's pod slice is a real subset of every
+-- master batch's numbers, and pod-vs-org comparisons have shape out of
+-- the box. The all-three and two-batch participants (401–405) stay
+-- unstamped: they represent people reached through the canonical links.
+-- ---------------------------------------------------------------------
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, recovery_token,
+  email_change, email_change_token_new, email_change_token_current
+) values
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-a000-000000000002',
+   'authenticated', 'authenticated', 'lead@violet.local',
+   extensions.crypt('password', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(),
+   '', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-a000-000000000003',
+   'authenticated', 'authenticated', 'project@violet.local',
+   extensions.crypt('password', extensions.gen_salt('bf')),
+   now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(),
+   '', '', '', '', '');
+
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+) values
+  (gen_random_uuid(), '00000000-0000-4000-a000-000000000002',
+   '00000000-0000-4000-a000-000000000002',
+   '{"sub":"00000000-0000-4000-a000-000000000002","email":"lead@violet.local","email_verified":true}',
+   'email', now(), now(), now()),
+  (gen_random_uuid(), '00000000-0000-4000-a000-000000000003',
+   '00000000-0000-4000-a000-000000000003',
+   '{"sub":"00000000-0000-4000-a000-000000000003","email":"project@violet.local","email_verified":true}',
+   'email', now(), now(), now());
+
+insert into staff (user_id, role, email, display_name) values
+  ('00000000-0000-4000-a000-000000000002', 'pod_lead',     'lead@violet.local',    'Sam (pod lead)'),
+  ('00000000-0000-4000-a000-000000000003', 'project_lead', 'project@violet.local', 'Ryan (project lead)');
+
+insert into batch_links (id, batch_id, owner_id, token) values
+  ('00000000-0000-4000-a000-000000000501', '00000000-0000-4000-a000-000000000301',
+   '00000000-0000-4000-a000-000000000002', 'seed-pod-spot-link'),
+  ('00000000-0000-4000-a000-000000000502', '00000000-0000-4000-a000-000000000302',
+   '00000000-0000-4000-a000-000000000002', 'seed-pod-rank-link'),
+  ('00000000-0000-4000-a000-000000000503', '00000000-0000-4000-a000-000000000303',
+   '00000000-0000-4000-a000-000000000002', 'seed-pod-clinic-ln');
+
+update responses set batch_link_id = '00000000-0000-4000-a000-000000000501'
+  where batch_id = '00000000-0000-4000-a000-000000000301'
+    and participant_id in ('00000000-0000-4000-a000-000000000406',
+                           '00000000-0000-4000-a000-000000000407',
+                           '00000000-0000-4000-a000-000000000408');
+update responses set batch_link_id = '00000000-0000-4000-a000-000000000502'
+  where batch_id = '00000000-0000-4000-a000-000000000302'
+    and participant_id in ('00000000-0000-4000-a000-000000000409',
+                           '00000000-0000-4000-a000-000000000410');
+update responses set batch_link_id = '00000000-0000-4000-a000-000000000503'
+  where batch_id = '00000000-0000-4000-a000-000000000303'
+    and participant_id in ('00000000-0000-4000-a000-000000000411',
+                           '00000000-0000-4000-a000-000000000412');

@@ -89,6 +89,11 @@ export async function submitAsync(
       questionId: input.questionId,
       participantId: input.participantId,
       batchId: batch.id,
+      // Which door they came through: null for the canonical token, the
+      // pod link's id otherwise. This single stamp is the whole pod
+      // attribution mechanism (PODS.md Wave 1) — the batch's org numbers
+      // ignore it, the pod slice filters on it.
+      batchLinkId: batch.linkId,
       answer: input.answer,
       rationale: input.rationale ?? null,
     });

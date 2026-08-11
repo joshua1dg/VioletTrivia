@@ -24,19 +24,22 @@ export type ResponseRow = {
   participantId: string;
   batchId: string | null;
   liveSessionId: string | null;
+  /** The pod link the answer came through, if any (PODS.md Wave 1). */
+  batchLinkId: string | null;
   answer: Answer;
   rationale: string | null;
   createdAt: string;
 };
 
 const COLUMNS =
-  "id, question_id, participant_id, batch_id, live_session_id, answer, rationale, created_at";
+  "id, question_id, participant_id, batch_id, live_session_id, batch_link_id, answer, rationale, created_at";
 
 export type ResponseInsert = {
   questionId: string;
   participantId: string;
   batchId?: string | null;
   liveSessionId?: string | null;
+  batchLinkId?: string | null;
   answer: Answer;
   rationale?: string | null;
 };
@@ -60,6 +63,7 @@ export async function insert(input: ResponseInsert): Promise<ResponseRow> {
       participant_id: input.participantId,
       batch_id: input.batchId ?? null,
       live_session_id: input.liveSessionId ?? null,
+      batch_link_id: input.batchLinkId ?? null,
       answer: input.answer,
       rationale: input.rationale ?? null,
     })
@@ -131,6 +135,7 @@ type RawResponse = {
   participant_id: string;
   batch_id: string | null;
   live_session_id: string | null;
+  batch_link_id: string | null;
   answer: unknown;
   rationale: string | null;
   created_at: string;
@@ -143,6 +148,7 @@ function mapResponse(row: RawResponse): ResponseRow {
     participantId: row.participant_id,
     batchId: row.batch_id,
     liveSessionId: row.live_session_id,
+    batchLinkId: row.batch_link_id,
     answer: parseJsonb(answerSchema, row.answer, {
       id: row.id,
       column: "answer",

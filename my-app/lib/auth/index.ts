@@ -19,13 +19,47 @@ import { AppError } from "@/lib/errors";
  * only via this script (or, later, by another admin inserting a row).
  */
 
-export type StaffRole = "admin" | "host";
+/** `pod_lead | project_lead | admin` (PODS.md, settled 2026-08-11). One
+ * project — the app is it — so `project_lead` is a role, not a role plus
+ * a grouping table. Derived from the DB enum so a migration can't drift
+ * from this type silently. */
+export type StaffRole =
+  import("@/lib/db/database.types").Database["public"]["Enums"]["staff_role"];
 
 export type Staff = {
   userId: string;
   email: string;
   role: StaffRole;
 };
+
+/**
+ * THE scope question, asked the same way everywhere (PODS.md decision 4):
+ * read access is full for every tier; roles gate what you can CHANGE and
+ * which analytics slice is yours.
+ *
+ * - `canCurateMaster` — mutate master batches, and later (Wave 2) review
+ *   proposed questions: project leads and admins.
+ * - `canManageBatch` — mutate a given batch: its owner, or anyone who can
+ *   curate masters. A batch with no owner is a master batch (the seeds,
+ *   and anything created before ownership existed).
+ * - `podScopeId` — whose slice this person's analytics filter to; null
+ *   means "no personal slice — you see every pod" (project leads, admins).
+ */
+export function canCurateMaster(staff: Staff): boolean {
+  return staff.role === "admin" || staff.role === "project_lead";
+}
+
+export function canManageBatch(
+  staff: Staff,
+  batch: { ownerId: string | null },
+): boolean {
+  if (canCurateMaster(staff)) return true;
+  return batch.ownerId !== null && batch.ownerId === staff.userId;
+}
+
+export function podScopeId(staff: Staff): string | null {
+  return staff.role === "pod_lead" ? staff.userId : null;
+}
 
 /**
  * Resolves the signed-in auth user (via getUser() — NEVER getSession(),
@@ -82,14 +116,29 @@ export async function getStaff(): Promise<Staff | null> {
   }
 }
 
-/** Accepts either role — admin ⊃ host. Throws AppError("unauthorized") when
- * not signed in, AppError("forbidden") when signed in but not staff. */
+/** Accepts every role — admin ⊃ project lead ⊃ pod lead. Throws
+ * AppError("unauthorized") when not signed in, AppError("forbidden") when
+ * signed in but not staff. */
 export async function requireStaff(): Promise<Staff> {
   return resolveStaff();
 }
 
-/** Admin only. Throws AppError("forbidden") for a signed-in host, same as
- * for a signed-in non-staff user — the message differs. */
+/** Project leads and admins — the master-content tier (curating master
+ * batches; Wave 2 question review). */
+export async function requireProjectLead(): Promise<Staff> {
+  const staff = await resolveStaff();
+  if (!canCurateMaster(staff)) {
+    throw new AppError(
+      "forbidden",
+      "This action requires a project lead or admin account.",
+    );
+  }
+  return staff;
+}
+
+/** Admin only — the system tier: staff, rubric, topics, deletion. Throws
+ * AppError("forbidden") for any lead, same as for a signed-in non-staff
+ * user — the message differs. */
 export async function requireAdmin(): Promise<Staff> {
   const staff = await resolveStaff();
   if (staff.role !== "admin") {

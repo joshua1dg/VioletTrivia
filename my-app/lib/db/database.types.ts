@@ -34,6 +34,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      batch_links: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          owner_id: string
+          token: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          owner_id: string
+          token: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_links_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_links_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       batch_questions: {
         Row: {
           batch_id: string
@@ -338,6 +377,7 @@ export type Database = {
         Row: {
           answer: Json
           batch_id: string | null
+          batch_link_id: string | null
           created_at: string
           id: string
           live_session_id: string | null
@@ -348,6 +388,7 @@ export type Database = {
         Insert: {
           answer: Json
           batch_id?: string | null
+          batch_link_id?: string | null
           created_at?: string
           id?: string
           live_session_id?: string | null
@@ -358,6 +399,7 @@ export type Database = {
         Update: {
           answer?: Json
           batch_id?: string | null
+          batch_link_id?: string | null
           created_at?: string
           id?: string
           live_session_id?: string | null
@@ -371,6 +413,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "responses_batch_link_id_fkey"
+            columns: ["batch_link_id"]
+            isOneToOne: false
+            referencedRelation: "batch_links"
             referencedColumns: ["id"]
           },
           {
@@ -485,7 +534,7 @@ export type Database = {
       batch_status: "draft" | "active" | "inactive"
       question_status: "draft" | "live" | "archived"
       session_phase: "lobby" | "voting" | "locked" | "revealed" | "ended"
-      staff_role: "admin" | "host"
+      staff_role: "admin" | "pod_lead" | "project_lead"
       template_type: "which_principle" | "rank_variants" | "write_feedback"
     }
     CompositeTypes: {
@@ -620,7 +669,7 @@ export const Constants = {
       batch_status: ["draft", "active", "inactive"],
       question_status: ["draft", "live", "archived"],
       session_phase: ["lobby", "voting", "locked", "revealed", "ended"],
-      staff_role: ["admin", "host"],
+      staff_role: ["admin", "pod_lead", "project_lead"],
       template_type: ["which_principle", "rank_variants", "write_feedback"],
     },
   },
