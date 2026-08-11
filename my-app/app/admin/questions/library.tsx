@@ -23,11 +23,15 @@ import type { Topic } from "@/lib/services/topics";
 export function QuestionLibrary({
   questions,
   topics,
+  initialTopicId = null,
 }: {
   questions: QuestionSummary[];
   topics: Topic[];
+  /** Preselects the topic chip — `/admin/questions?topic=<slug>`, resolved
+   * by the page. The topics screen links through per topic. */
+  initialTopicId?: string | null;
 }) {
-  const [topicId, setTopicId] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string | null>(initialTopicId);
   const [template, setTemplate] = useState<TemplateKey | null>(null);
   const [search, setSearch] = useState("");
 

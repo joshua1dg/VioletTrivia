@@ -6,6 +6,7 @@
 // delete via <ConfirmDelete> (which owns its own transition).
 
 import { useActionState, useState, useTransition } from "react";
+import Link from "next/link";
 
 import { GhostButton } from "@/components/admin/ui";
 import { ConfirmDelete, ErrorNote, SubmitButton } from "@/components/feedback";
@@ -207,11 +208,22 @@ function TopicRow({
 
   return (
     <div className="grid grid-cols-[1fr_200px_100px_120px_auto] items-center gap-2 border-b border-line-3 px-4 py-3 transition-colors last:border-b-0 hover:bg-surface">
-      <span className="text-[13.5px] text-ink-3">{topic.label}</span>
+      {/* The label IS the way into the topic: the questions library,
+          pre-filtered to it. Rename/delete stay as the explicit buttons on
+          the right, so the row's one click target does the obvious thing. */}
+      <Link
+        href={`/admin/questions?topic=${topic.slug}`}
+        className="text-[13.5px] text-ink-3 transition-colors hover:text-violet-ink hover:underline"
+      >
+        {topic.label}
+      </Link>
       <span className="font-mono text-[12.5px] text-muted-2">{topic.slug}</span>
-      <span className="text-[12.5px] text-muted-2 tabular-nums">
+      <Link
+        href={`/admin/questions?topic=${topic.slug}`}
+        className="text-[12.5px] text-muted-2 tabular-nums transition-colors hover:text-violet-ink hover:underline"
+      >
         {topic.questionCount}
-      </span>
+      </Link>
       <span className="text-[12.5px] text-muted-3 tabular-nums">
         {topic.sortOrder}
       </span>

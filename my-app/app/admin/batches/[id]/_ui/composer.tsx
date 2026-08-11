@@ -16,6 +16,7 @@ import {
 } from "@/components/feedback";
 import type { BatchWithCounts } from "@/lib/services/batches";
 import type { QuestionSummary } from "@/lib/services/questions";
+import type { Topic } from "@/lib/services/topics";
 
 import { deleteBatch, saveBatch } from "../../actions";
 import { QuestionLibraryPanel } from "./question-library-panel";
@@ -57,10 +58,12 @@ export function Composer({
   batch,
   initialQueue,
   library,
+  topics,
 }: {
   batch: BatchWithCounts;
   initialQueue: string[];
   library: QuestionSummary[];
+  topics: Topic[];
 }) {
   const router = useRouter();
 
@@ -158,6 +161,7 @@ export function Composer({
         <SettingsPanel draft={settings} onChange={changeSettings} />
         <QuestionLibraryPanel
           library={library}
+          topics={topics}
           selectedIds={selectedIds}
           onToggle={toggle}
         />

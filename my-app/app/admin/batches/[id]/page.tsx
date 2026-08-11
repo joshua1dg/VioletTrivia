@@ -5,6 +5,7 @@ import { SkippedRowsBanner } from "@/components/feedback";
 import { isAppError } from "@/lib/errors";
 import { getByIdWithCounts, getQuestionIds } from "@/lib/services/batches";
 import { listQuestionSummaries } from "@/lib/services/questions";
+import { listTopics } from "@/lib/services/topics";
 
 import { Composer } from "./_ui/composer";
 
@@ -29,9 +30,10 @@ export default async function BatchComposerPage({
     throw error;
   }
 
-  const [queue, library] = await Promise.all([
+  const [queue, library, topics] = await Promise.all([
     getQuestionIds(id),
     listQuestionSummaries(),
+    listTopics(),
   ]);
 
   return (
@@ -47,7 +49,12 @@ export default async function BatchComposerPage({
         </div>
       )}
 
-      <Composer batch={batch} initialQueue={queue} library={library.rows} />
+      <Composer
+        batch={batch}
+        initialQueue={queue}
+        library={library.rows}
+        topics={topics}
+      />
     </>
   );
 }
