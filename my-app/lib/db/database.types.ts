@@ -553,7 +553,7 @@ export type Database = {
     Enums: {
       batch_status: "draft" | "active" | "inactive"
       question_status: "draft" | "live" | "archived"
-      review_status: "proposed" | "approved" | "denied"
+      review_status: "draft" | "proposed" | "approved" | "denied"
       session_phase: "lobby" | "voting" | "locked" | "revealed" | "ended"
       staff_role: "admin" | "pod_lead" | "project_lead"
       template_type: "which_principle" | "rank_variants" | "write_feedback"
@@ -689,7 +689,7 @@ export const Constants = {
     Enums: {
       batch_status: ["draft", "active", "inactive"],
       question_status: ["draft", "live", "archived"],
-      review_status: ["proposed", "approved", "denied"],
+      review_status: ["draft", "proposed", "approved", "denied"],
       session_phase: ["lobby", "voting", "locked", "revealed", "ended"],
       staff_role: ["admin", "pod_lead", "project_lead"],
       template_type: ["which_principle", "rank_variants", "write_feedback"],

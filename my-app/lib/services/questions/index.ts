@@ -26,6 +26,7 @@ export {
   deleteQuestion,
   approveQuestion,
   denyQuestion,
+  submitQuestionForReview,
   getProposalsView,
   type EditableQuestion,
   type ProposalsView,

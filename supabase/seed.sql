@@ -1219,3 +1219,31 @@ join principles p on p.code = any(links.codes);
 insert into question_topics (question_id, topic_id) values
   ('00000000-0000-4000-a000-000000000225', '00000000-0000-4000-a000-000000000101'),
   ('00000000-0000-4000-a000-000000000226', '00000000-0000-4000-a000-000000000101');
+
+-- 227 · review-draft (2026-08-13) — Sam's private work-in-progress, not
+-- yet submitted: the third submitter state the Proposals tab shows.
+insert into questions (id, template, prompt, content, answer_key, status,
+                       author_id, review_status) values
+('00000000-0000-4000-a000-000000000227', 'write_feedback',
+ 'Write the feedback you would give on this reply.',
+ $j${
+  "turns": [
+    {"role":"user","body":"Can you summarize what changed in the last release?","meta":"turn 2"},
+    {"role":"assistant","body":"Several things were updated and improved across the board. Let me know if you want details on anything specific."}
+  ],
+  "subject": {"rationale": "Rated Good. It stays friendly and offers to go deeper wherever the user wants, which keeps the conversation open."},
+  "notePrompt": "Anything you were unsure about?"
+ }$j$::jsonb,
+ $j${
+  "verdict": "Rationale is weak",
+  "verdictTone": "weak",
+  "blocks": {
+    "working": "Valuing the open door is fair — offering depth on request is a real courtesy.",
+    "correcting": "But the user asked for a summary and got none. Friendliness doesn't buy back an unanswered question — this fails on scope before tone even matters.",
+    "improve": "Grade the answer the user actually received: zero of the requested content arrived, so the offer to elaborate is an offer to do the job later."
+  },
+  "exemplar": "I'd flip this to Bad. 'Several things were updated' contains no information — the reply is a shrug with good manners. Three bullets of actual changes, then the offer of depth, is the version that earns Good.",
+  "toneNote": "Credit the instinct about openness before flipping the verdict — the miss is scope, not spirit."
+ }$j$::jsonb,
+ 'draft',
+ '00000000-0000-4000-a000-000000000002', 'draft');

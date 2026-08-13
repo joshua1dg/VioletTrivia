@@ -1,0 +1,21 @@
+-- Wave 2 refinement (2026-08-13): the queue is the only road into the
+-- library — for everyone. Curators no longer create born-approved
+-- questions; they submit like anyone else and may self-approve from the
+-- Proposals tab ("same process as everybody else"). That needs a stage
+-- BEFORE the queue: 'draft' — private work-in-progress, saved freely,
+-- entering review only on an explicit "Submit for review".
+--
+--   draft → proposed → approved | denied → (edit, resubmit) → proposed
+--
+-- Orthogonality with the lifecycle enum is unchanged: lifecycle answers
+-- "can this be answered right now?", review answers "has the roundtable
+-- vetted this?". A review-draft is also lifecycle-draft in practice, but
+-- the columns stay independent — approval flips lifecycle to live, and
+-- curators manage lifecycle on approved questions as before.
+--
+-- ADD VALUE only; nothing here uses the new value (Postgres forbids
+-- using an enum value added in the same transaction). The DB default
+-- stays 'approved' so seeds and pre-review rows keep working; the
+-- service sets 'draft' explicitly on every create.
+
+alter type review_status add value 'draft' before 'proposed';

@@ -178,7 +178,7 @@ export async function getProposalsView(): Promise<ProposalsView> {
   const [mine, queue] = await Promise.all([
     listQuestionSummaries({
       authorId: staff.userId,
-      reviewStatuses: ["proposed", "denied", "approved"],
+      reviewStatuses: ["draft", "proposed", "denied", "approved"],
     }),
     reviewer
       ? listQuestionSummaries({ reviewStatuses: ["proposed"] })
@@ -258,22 +258,22 @@ export async function createQuestion(
   input: QuestionInput,
 ): Promise<{ id: string }> {
   const staff = await requireStaff();
-  const curator = canCurateMaster(staff);
 
   const { storedContent, answerKey, principleCodes } = await validate(input);
 
-  // Same form for everyone; the ROLE decides where it lands (Wave 2).
-  // A curator's question goes wherever they pointed it. Anyone else's is
-  // forced into the pile: review_status 'proposed', lifecycle 'draft' —
-  // whatever status the client claimed. A Server Action is a public
-  // endpoint; the forcing happens here, not in the form.
+  // Same process for everyone — curators included (2026-08-13): every
+  // question is born a private review-draft, whatever the client claimed,
+  // and enters the queue only through submitQuestionForReview. Role
+  // decides who can APPROVE, not who can skip the line; a curator's
+  // shortcut is self-approving from the Proposals tab. A Server Action
+  // is a public endpoint; the forcing happens here, not in the form.
   const { id } = await repo.insert({
     template: input.template,
     prompt: input.prompt,
     content: storedContent,
     answerKey,
-    status: curator ? input.status : "draft",
-    reviewStatus: curator ? "approved" : "proposed",
+    status: "draft",
+    reviewStatus: "draft",
     authorId: staff.userId,
   });
 
@@ -295,17 +295,19 @@ export async function updateQuestion(
 
   const { storedContent, answerKey, principleCodes } = await validate(input);
 
+  // Saving never moves the review needle (2026-08-13) — save means save,
+  // submit means submit (submitQuestionForReview below), verdicts go
+  // through approve/deny. The one lifecycle rule: only an APPROVED
+  // question takes the client's status — a curator publishing unvetted
+  // work by "Save & publish" would be skipping the very line everyone
+  // now stands in. Everything unapproved stays lifecycle-draft.
   await repo.update(id, {
     template: input.template,
     prompt: input.prompt,
     content: storedContent,
     answerKey,
-    status: curator ? input.status : "draft",
-    // The resubmit path, implicit on purpose: a submitter saving a DENIED
-    // question sends it back to the pile — revision beside the note, no
-    // separate "resubmit" button to forget. Curator saves never touch the
-    // review dimension here; verdicts go through approve/deny below.
-    ...(curator ? {} : { reviewStatus: "proposed" as const }),
+    status:
+      curator && current.reviewStatus === "approved" ? input.status : "draft",
   });
 
   // Not transactional — see the note above.
@@ -356,6 +358,33 @@ export async function deleteQuestion(id: string): Promise<void> {
     }
   }
   await repo.remove(id);
+}
+
+/**
+ * The explicit step from private work to the roundtable's queue
+ * (2026-08-13): draft or denied → proposed. Author or curator only —
+ * and being explicit is the point: saving a revision and putting it in
+ * front of reviewers are different decisions, so they are different
+ * clicks (this replaced the implicit resubmit-on-save).
+ */
+export async function submitQuestionForReview(id: string): Promise<void> {
+  const staff = await requireStaff();
+  const current = await repo.getWithKey(id);
+
+  if (!canCurateMaster(staff) && current.authorId !== staff.userId) {
+    throw new AppError(
+      "forbidden",
+      "Only the question's author can submit it for review.",
+    );
+  }
+  if (current.reviewStatus === "approved") {
+    throw new AppError("conflict", "This question is already approved.");
+  }
+  if (current.reviewStatus === "proposed") {
+    throw new AppError("conflict", "This question is already in review.");
+  }
+
+  await repo.update(id, { reviewStatus: "proposed" });
 }
 
 /* ------------------------------------------------------------------ *
