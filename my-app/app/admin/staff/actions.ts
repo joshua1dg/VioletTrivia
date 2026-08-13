@@ -24,28 +24,26 @@ export type ActionResult = { ok: true } | { ok: false; message: string };
 const roleValues = ["pod_lead", "dol", "admin"] as const;
 const roleInput: z.ZodType<StaffRoleValue> = z.enum(roleValues);
 
-const createStaffInput = z.object({
+const inviteStaffInput = z.object({
   email: z.string().trim().min(1, "Email is required.").toLowerCase().email(
     "Enter a valid email address.",
   ),
-  password: z.string().min(8, "Use at least 8 characters."),
-  displayName: z.string().trim().min(1).max(80).nullable(),
   role: roleInput,
 });
 
-/** Shaped for useActionState: (prevState, formData) — the create form. */
-export async function createStaff(
+/** THE way in (2026-08-13; the admin-typed temp-password path is gone) —
+ * no password field: Supabase mails the link, the invitee sets their own
+ * on /welcome. Shaped for useActionState: (prevState, formData). */
+export async function inviteStaff(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
   try {
-    const input = createStaffInput.parse({
+    const input = inviteStaffInput.parse({
       email: formData.get("email"),
-      password: formData.get("password"),
-      displayName: formData.get("displayName") || null,
       role: formData.get("role"),
     });
-    await staff.createStaff(input);
+    await staff.inviteStaff(input);
     revalidatePath("/admin/staff");
     return { ok: true };
   } catch (error) {

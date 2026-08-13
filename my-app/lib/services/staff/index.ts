@@ -4,7 +4,7 @@ import "server-only";
 
 export {
   listStaff,
-  createStaff,
+  inviteStaff,
   changeRole,
   removeStaff,
   type StaffRoleValue,

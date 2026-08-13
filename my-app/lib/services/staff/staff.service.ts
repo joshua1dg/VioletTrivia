@@ -12,14 +12,13 @@ import type { StaffRoleValue, StaffRow } from "@/lib/repos/staff";
  * throughout, per the role matrix in PODS.md decision 4 — staff, like the
  * rubric and topics, is a system-tier concern.
  *
- * `createStaff` provisions BOTH halves of a login the way
- * `scripts/bootstrap-admin.ts` does: an `auth.users` row via the GoTrue
- * admin API, then the matching `staff` row. Simpler than the script on
- * purpose — this is an in-app action for someone who is already signed in
- * as an admin, so "email already registered" is just a validation error to
- * show them, not a case to idempotently repair (the script's re-run story
- * doesn't apply here; nobody re-submits this form expecting it to reuse an
- * existing account).
+ * Provisioning is invite-only (2026-08-13; the earlier admin-typed
+ * temp-password path was removed the same day the invite flow proved
+ * itself): `inviteStaff` creates the `auth.users` row via the GoTrue
+ * admin API and the matching `staff` row, and the invitee sets their own
+ * password on /welcome. "Email already registered" is just a validation
+ * error to show the admin, not a case to idempotently repair (the
+ * bootstrap script's re-run story doesn't apply here).
  */
 
 export type { StaffRoleValue, StaffRow };
@@ -32,26 +31,31 @@ export async function listStaff(): Promise<StaffRow[]> {
   return repo.list();
 }
 
-export async function createStaff(input: {
+/**
+ * The invite flow (2026-08-13), and the preferred way in: the admin types
+ * an email and a role, Supabase mails an invite link, the person sets
+ * their OWN password on /welcome — no temp-password ritual. The staff row
+ * exists from this moment, so the role is editable before they've even
+ * opened the email ("I can add their types after the fact").
+ *
+ * The link's shape lives in supabase/templates/invite.html (token_hash →
+ * /auth/confirm → verifyOtp), so no redirectTo is passed here — the
+ * template pins the destination.
+ */
+export async function inviteStaff(input: {
   email: string;
-  password: string;
-  displayName?: string | null;
   role: StaffRoleValue;
 }): Promise<StaffRow> {
   await requireAdmin();
 
-  const created = await serviceClient().auth.admin.createUser({
-    email: input.email,
-    password: input.password,
-    email_confirm: true,
-  });
+  const invited = await serviceClient().auth.admin.inviteUserByEmail(
+    input.email,
+  );
 
-  if (!created.data.user) {
-    // Same "already registered" shapes bootstrap-admin.ts checks for, but
-    // there is no idempotency dance here — just tell the admin.
+  if (!invited.data.user) {
     const alreadyRegistered =
-      created.error?.code === "email_exists" ||
-      /already.*registered/i.test(created.error?.message ?? "");
+      invited.error?.code === "email_exists" ||
+      /already.*registered/i.test(invited.error?.message ?? "");
 
     if (alreadyRegistered) {
       throw new AppError(
@@ -61,16 +65,17 @@ export async function createStaff(input: {
     }
 
     throw new AppError("unavailable", GENERIC_USER_MESSAGE, {
-      cause: created.error,
-      message: created.error?.message ?? "auth.admin.createUser returned no user",
+      cause: invited.error,
+      message:
+        invited.error?.message ?? "auth.admin.inviteUserByEmail returned no user",
     });
   }
 
   return repo.upsert({
-    userId: created.data.user.id,
+    userId: invited.data.user.id,
     role: input.role,
     email: input.email,
-    displayName: input.displayName ?? null,
+    displayName: null,
   });
 }
 

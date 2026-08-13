@@ -1,18 +1,22 @@
 "use client";
 
 // The one client boundary on this screen (house pattern, same split as
-// app/admin/topics/_ui/topics-table.tsx). Owns create via useActionState,
-// role changes via useTransition (imperative — a `<select>` isn't a form
-// submit), and delete via <ConfirmDelete> (which owns its own transition).
+// app/admin/topics/_ui/topics-table.tsx). Owns the invite flow via
+// useActionState, role changes via useTransition (imperative — a
+// `<select>` isn't a form submit), and delete via <ConfirmDelete> (which
+// owns its own transition). It also renders the PageHeader — a deviation
+// from the page-renders-the-header pattern, because the header's "Add
+// staff" button and the invite card it toggles share state (2026-08-13).
 
 import { useActionState, useState, useTransition } from "react";
 
+import { PageHeader } from "@/components/admin/ui";
 import { ConfirmDelete, ErrorNote, SubmitButton } from "@/components/feedback";
 import type { StaffRoleValue, StaffRow } from "@/lib/services/staff";
 
 import {
   changeRole,
-  createStaff,
+  inviteStaff,
   removeStaff,
   type ActionResult,
 } from "../actions";
@@ -41,9 +45,29 @@ export function StaffTable({
   staff: StaffRow[];
   currentUserId: string | null;
 }) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <CreateStaffForm count={staff.length} />
+    <>
+      <PageHeader
+        title="Staff"
+        meta={`${staff.length} account${staff.length === 1 ? "" : "s"}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => setInviteOpen((open) => !open)}
+            className={
+              inviteOpen
+                ? "cursor-pointer rounded-[8px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
+                : "cursor-pointer rounded-[8px] bg-violet px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-ink"
+            }
+          >
+            {inviteOpen ? "Cancel" : "Add staff"}
+          </button>
+        }
+      />
+      <div className="flex flex-col gap-4 p-6">
+      {inviteOpen && <InviteStaffForm count={staff.length} />}
 
       <div className="overflow-hidden rounded-[10px] border border-line">
         <div className="grid grid-cols-[1fr_1fr_180px_120px_auto] items-center gap-0 border-b border-line-2 bg-surface px-4 py-2.5 text-[11.5px] tracking-[0.04em] text-faint">
@@ -56,7 +80,8 @@ export function StaffTable({
 
         {staff.length === 0 && (
           <p className="px-4 py-8 text-[13.5px] text-muted-3">
-            No staff yet — create the first one above.
+            No staff yet — use &ldquo;Add staff&rdquo; above to invite the
+            first one.
           </p>
         )}
 
@@ -68,52 +93,37 @@ export function StaffTable({
           />
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
-function CreateStaffForm({ count }: { count: number }) {
-  const [state, action] = useActionState(createStaff, initialState);
+/** THE way in (2026-08-13 — the temp-password form is gone): email +
+ * role, Supabase mails the link, they set their own password on
+ * /welcome. The row appears in the table immediately, so the role is
+ * adjustable before they even accept. Hidden behind the header's "Add
+ * staff" button; deliberately NOT keyed-remounted on open/close so a
+ * half-typed email survives an accidental toggle. */
+function InviteStaffForm({ count }: { count: number }) {
+  const [state, action] = useActionState(inviteStaff, initialState);
 
   return (
     <form
-      // Keyed by count so a successful create clears the (uncontrolled)
-      // inputs by remounting the form, same trick as CreateTopicForm.
       key={count}
       action={action}
-      className="flex flex-wrap items-end gap-2.5 rounded-[10px] border border-line bg-white p-4"
+      className="flex flex-wrap items-end gap-2.5 rounded-[10px] border border-violet-line-2 bg-violet-tint-2/40 p-4"
     >
+      <span className="basis-full text-[12px] font-medium text-violet-ink">
+        Invite by email — they set their own password
+      </span>
       <label className="flex flex-col gap-1.5">
         <span className="text-[12px] font-medium text-muted">Email</span>
         <input
           type="email"
           name="email"
           required
-          placeholder="lead@violet.local"
-          className="w-52 rounded-[7px] border border-line px-3 py-1.5 text-[13.5px] text-ink outline-none focus:border-violet"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-medium text-muted">
-          Password
-        </span>
-        <input
-          type="text"
-          name="password"
-          required
-          minLength={8}
-          placeholder="at least 8 characters"
-          className="w-48 rounded-[7px] border border-line px-3 py-1.5 text-[13.5px] text-ink outline-none focus:border-violet"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-medium text-muted">
-          Display name
-        </span>
-        <input
-          name="displayName"
-          placeholder="Jane Doe"
-          className="w-40 rounded-[7px] border border-line px-3 py-1.5 text-[13.5px] text-ink outline-none focus:border-violet"
+          placeholder="them@company.com"
+          className="w-64 rounded-[7px] border border-line px-3 py-1.5 text-[13.5px] text-ink outline-none focus:border-violet"
         />
       </label>
       <label className="flex flex-col gap-1.5">
@@ -130,13 +140,13 @@ function CreateStaffForm({ count }: { count: number }) {
           ))}
         </select>
       </label>
-      <SubmitButton>Add staff</SubmitButton>
+      <SubmitButton>Send invite</SubmitButton>
 
       <div className="basis-full">
         {state?.ok === true && (
           <p className="text-[12.5px] text-ok-ink">
-            Created — they can sign in at /login with that email and
-            password.
+            Invite sent — they&rsquo;re in the table below already, so you can
+            adjust the role any time.
           </p>
         )}
         <ErrorNote error={state?.ok === false ? state.message : null} />

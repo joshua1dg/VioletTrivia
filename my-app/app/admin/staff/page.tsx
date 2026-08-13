@@ -33,13 +33,7 @@ export default async function StaffPage() {
   // controls in the table; the service enforces it regardless.
   const me = await getStaff();
 
-  return (
-    <>
-      <PageHeader
-        title="Staff"
-        meta={`${rows.length} account${rows.length === 1 ? "" : "s"}`}
-      />
-      <StaffTable staff={rows} currentUserId={me?.userId ?? null} />
-    </>
-  );
+  // StaffTable renders the PageHeader itself — the header's "Add staff"
+  // button toggles the invite card, and that state lives client-side.
+  return <StaffTable staff={rows} currentUserId={me?.userId ?? null} />;
 }
