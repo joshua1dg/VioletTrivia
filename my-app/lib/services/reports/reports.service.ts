@@ -43,19 +43,45 @@ import { buildTopicRows, type TopicRow } from "./topic.util";
  * ------------------------------------------------------------------ */
 
 async function loadPodAttribution(): Promise<PodAttribution> {
-  const [links, batches, sessions] = await Promise.all([
+  const [links, batches, sessions, staffRows] = await Promise.all([
     linksRepo.listAll(),
     repo.listBatchOwners(),
     repo.listSessionHosts(),
+    staffRepo.list(),
   ]);
-  return buildPodAttribution(links, batches, sessions);
+  // Batch-ownership attribution counts POD-LEAD-owned batches only. A
+  // curator's owned batches are master batches by definition — letting
+  // them attribute would pour every canonical answer into that curator's
+  // "pod" and drown the real pods. A curator's personal pod is therefore
+  // their LINKS plus the sessions they host (2026-08-11: anyone may run a
+  // pod; role is the permission ceiling, pod-ness is a fact about data).
+  const podLeadIds = new Set(
+    staffRows.filter((r) => r.role === "pod_lead").map((r) => r.userId),
+  );
+  return buildPodAttribution(
+    links,
+    batches.filter((b) => b.ownerId !== null && podLeadIds.has(b.ownerId)),
+    sessions,
+  );
 }
 
+/**
+ * Which pod's slice to show. A pod lead: always their own, no exceptions.
+ * A full-scope viewer: whatever `?pod=` names; the sentinel "project"
+ * means explicitly none; and NO param defaults to their own slice — a
+ * project lead who also runs a pod sees it beside the project numbers
+ * just like a pod lead would (the reads drop an empty defaulted slice, so
+ * a curator with no pod sees nothing extra).
+ */
 function resolvePodScope(
   staff: Staff,
   requestedPodId: string | null | undefined,
-): string | null {
-  return podScopeId(staff) ?? requestedPodId ?? null;
+): { podId: string | null; selfDefaulted: boolean } {
+  const own = podScopeId(staff);
+  if (own) return { podId: own, selfDefaulted: false };
+  if (requestedPodId === "project") return { podId: null, selfDefaulted: false };
+  if (requestedPodId) return { podId: requestedPodId, selfDefaulted: false };
+  return { podId: staff.userId, selfDefaulted: true };
 }
 
 /** "Your pod" for the lead looking at their own slice; the lead's display
@@ -72,9 +98,12 @@ async function podLabel(staff: Staff, podId: string): Promise<string> {
 async function buildPodOverall(
   staff: Staff,
   podId: string | null,
+  selfDefaulted: boolean,
   core: { pod: PodSlice | null; authored: AuthoredQuestion[] },
 ): Promise<PodOverall | null> {
   if (!podId || !core.pod) return null;
+  // Defaulted self-slices with no data render nothing (see resolvePodScope).
+  if (selfDefaulted && core.pod.responseCount === 0) return null;
   return {
     podId,
     label: await podLabel(staff, podId),
@@ -105,16 +134,16 @@ async function buildPodBreakdownRows(
   staff: Staff,
   rows: ReportResponseRow[],
   questionsById: Map<string, AuthoredQuestion>,
+  attribution: PodAttribution,
 ): Promise<PodBreakdownRow[] | null> {
   if (podScopeId(staff) !== null) return null;
 
-  const [staffRows, attribution] = await Promise.all([
-    staffRepo.list(),
-    loadPodAttribution(),
-  ]);
+  const staffRows = await staffRepo.list();
 
+  // Every staff member is a candidate pod — role is the permission
+  // ceiling, pod-ness is attributable data (2026-08-11). The
+  // responseCount > 0 filter below is what keeps podless people out.
   const breakdown = staffRows
-    .filter((row) => row.role === "pod_lead")
     .map((row) => {
       const slice = buildPodSlice(rows, row.userId, attribution, questionsById);
       return {
@@ -141,9 +170,20 @@ export type PodOption = { userId: string; label: string };
  * dashboard and the batch report (PODS.md: "sliceable by pod"). */
 export async function listPodOptions(): Promise<PodOption[]> {
   await requireStaff();
-  const rows = await staffRepo.list();
+  const [rows, links, sessions] = await Promise.all([
+    staffRepo.list(),
+    linksRepo.listAll(),
+    repo.listSessionHosts(),
+  ]);
+  // A "pod" is anyone who could have a slice: every pod lead, plus any
+  // curator who holds a pod link or has hosted a session (2026-08-11:
+  // project leads and admins can run pods too).
+  const owners = new Set<string>([
+    ...links.map((l) => l.ownerId),
+    ...sessions.flatMap((s) => (s.hostId ? [s.hostId] : [])),
+  ]);
   return rows
-    .filter((row) => row.role === "pod_lead")
+    .filter((row) => row.role === "pod_lead" || owners.has(row.userId))
     .map((row) => ({
       userId: row.userId,
       label: row.displayName ?? row.email ?? row.userId,
@@ -250,7 +290,7 @@ export async function getBatchReport(
   requestedPodId?: string | null,
 ): Promise<BatchReport> {
   const staff = await requireStaff();
-  const podId = resolvePodScope(staff, requestedPodId);
+  const { podId, selfDefaulted } = resolvePodScope(staff, requestedPodId);
 
   const [batch, questionIds] = await Promise.all([
     batchesService.getById(batchId),
@@ -263,7 +303,7 @@ export async function getBatchReport(
       questionsService.listWithKey(questionIds),
       repo.listPrincipleLinksForQuestions(questionIds),
       repo.listTopicLinksForQuestions(questionIds),
-      podId ? loadPodAttribution() : Promise.resolve(null),
+      loadPodAttribution(),
     ]);
 
   const questionsById = new Map(
@@ -283,17 +323,22 @@ export async function getBatchReport(
   ).size;
 
   let pod: PodComparison | null = null;
-  if (podId && attribution) {
+  if (podId) {
     const slice = buildPodSlice(responses.rows, podId, attribution, questionsById);
-    pod = {
-      podId,
-      label: await podLabel(staff, podId),
-      responseCount: slice.responseCount,
-      correct: slice.correct,
-      total: slice.total,
-      rubric: buildRubricRows(slice.graded, principleLinks),
-      topics: buildTopicRows(slice.graded, topicLinks),
-    };
+    // A DEFAULTED self-slice with no data renders nothing — a curator who
+    // runs no pod shouldn't see an empty "Your pod" everywhere. Explicit
+    // selections (and pod leads) keep the empty state on purpose.
+    if (!selfDefaulted || slice.responseCount > 0) {
+      pod = {
+        podId,
+        label: await podLabel(staff, podId),
+        responseCount: slice.responseCount,
+        correct: slice.correct,
+        total: slice.total,
+        rubric: buildRubricRows(slice.graded, principleLinks),
+        topics: buildTopicRows(slice.graded, topicLinks),
+      };
+    }
   }
 
   return {
@@ -315,6 +360,7 @@ export async function getBatchReport(
       staff,
       responses.rows,
       questionsById,
+      attribution,
     ),
   };
 }
@@ -369,17 +415,17 @@ export async function getOrgReport(
   requestedPodId?: string | null,
 ): Promise<OrgReport> {
   const staff = await requireStaff();
-  const podId = resolvePodScope(staff, requestedPodId);
+  const { podId, selfDefaulted } = resolvePodScope(staff, requestedPodId);
 
   const summaries = await questionsService.listQuestionSummaries();
   const allIds = summaries.rows.map((q) => q.id);
 
-  const attribution = podId ? await loadPodAttribution() : null;
+  const attribution = await loadPodAttribution();
 
   const [core, principleLinks, topicLinks, batchRows] = await Promise.all([
     loadQuestionStats(
       allIds,
-      podId && attribution ? { podId, attribution } : undefined,
+      podId ? { podId, attribution } : undefined,
     ),
     repo.listPrincipleLinksForQuestions(allIds),
     repo.listTopicLinksForQuestions(allIds),
@@ -410,7 +456,7 @@ export async function getOrgReport(
     .sort((a, b) => b.count - a.count);
 
   let pod: PodComparison | null = null;
-  if (podId && core.pod) {
+  if (podId && core.pod && (!selfDefaulted || core.pod.responseCount > 0)) {
     pod = {
       podId,
       label: await podLabel(staff, podId),
@@ -443,6 +489,7 @@ export async function getOrgReport(
       staff,
       core.rawRows,
       new Map(core.authored.map((q) => [q.id, q])),
+      attribution,
     ),
   };
 }
@@ -518,7 +565,7 @@ export async function getQuestionReport(
   questionId: string,
 ): Promise<QuestionReport> {
   const staff = await requireStaff();
-  const podId = podScopeId(staff);
+  const { podId, selfDefaulted } = resolvePodScope(staff, undefined);
 
   const question = await questionsService.getWithKey(questionId);
 
@@ -528,7 +575,7 @@ export async function getQuestionReport(
       repo.listPrincipleLinksForQuestions([questionId]),
       repo.listTopicLinksForQuestions([questionId]),
       repo.listBatchLinksForQuestions([questionId]),
-      podId ? loadPodAttribution() : Promise.resolve(null),
+      loadPodAttribution(),
     ]);
 
   const questionsById = new Map([[question.id, question]]);
@@ -539,16 +586,18 @@ export async function getQuestionReport(
   const answers = firstAnswers.rows.map((row) => row.answer);
 
   let pod: QuestionPodReport | null = null;
-  if (podId && attribution) {
+  if (podId) {
     const slice = buildPodSlice(responses.rows, podId, attribution, questionsById);
-    pod = {
-      podId,
-      label: await podLabel(staff, podId),
-      responseCount: slice.responseCount,
-      correct: slice.correct,
-      total: slice.total,
-      tally: tallyFor(question, slice.firstAnswers.map((row) => row.answer)),
-    };
+    if (!selfDefaulted || slice.responseCount > 0) {
+      pod = {
+        podId,
+        label: await podLabel(staff, podId),
+        responseCount: slice.responseCount,
+        correct: slice.correct,
+        total: slice.total,
+        tally: tallyFor(question, slice.firstAnswers.map((row) => row.answer)),
+      };
+    }
   }
 
   return {
@@ -579,7 +628,12 @@ export async function getQuestionReport(
     batches: dedupeBatches(batchLinks),
     skipped: responses.skipped,
     pod,
-    podBreakdown: await buildPodBreakdownRows(staff, responses.rows, questionsById),
+    podBreakdown: await buildPodBreakdownRows(
+      staff,
+      responses.rows,
+      questionsById,
+      attribution,
+    ),
   };
 }
 
@@ -606,7 +660,7 @@ export type TopicReport = {
 
 export async function getTopicReport(slug: string): Promise<TopicReport> {
   const staff = await requireStaff();
-  const podId = podScopeId(staff);
+  const { podId, selfDefaulted } = resolvePodScope(staff, undefined);
 
   const topic = (await topicsService.listTopics()).find(
     (t) => t.slug === slug,
@@ -614,12 +668,12 @@ export async function getTopicReport(slug: string): Promise<TopicReport> {
   if (!topic) throw new AppError("not_found", "No such topic.");
 
   const questionIds = await repo.listQuestionIdsForTopic(topic.id);
-  const attribution = podId ? await loadPodAttribution() : null;
+  const attribution = await loadPodAttribution();
 
   const [core, batchLinks, principles] = await Promise.all([
     loadQuestionStats(
       questionIds,
-      podId && attribution ? { podId, attribution } : undefined,
+      podId ? { podId, attribution } : undefined,
     ),
     repo.listBatchLinksForQuestions(questionIds),
     principlesService.listPrinciples(),
@@ -653,11 +707,12 @@ export async function getTopicReport(slug: string): Promise<TopicReport> {
     keyCodes,
     batches: dedupeBatches(batchLinks),
     skipped: core.skipped,
-    pod: await buildPodOverall(staff, podId, core),
+    pod: await buildPodOverall(staff, podId, selfDefaulted, core),
     podBreakdown: await buildPodBreakdownRows(
       staff,
       core.rawRows,
       new Map(core.authored.map((q) => [q.id, q])),
+      attribution,
     ),
   };
 }
@@ -699,7 +754,7 @@ export async function getPrincipleReport(
   code: string,
 ): Promise<PrincipleReport> {
   const staff = await requireStaff();
-  const podId = podScopeId(staff);
+  const { podId, selfDefaulted } = resolvePodScope(staff, undefined);
 
   const principle = (await principlesService.listPrinciples()).find(
     (p) => p.code === code,
@@ -714,12 +769,12 @@ export async function getPrincipleReport(
   const keyed = inPlay.rows.filter((q) => keyCode(q) === code);
   const keyedIds = keyed.map((q) => q.id);
 
-  const attribution = podId ? await loadPodAttribution() : null;
+  const attribution = await loadPodAttribution();
 
   const [core, batchLinks] = await Promise.all([
     loadQuestionStats(
       keyedIds,
-      podId && attribution ? { podId, attribution } : undefined,
+      podId ? { podId, attribution } : undefined,
     ),
     repo.listBatchLinksForQuestions(keyedIds),
   ]);
@@ -773,11 +828,12 @@ export async function getPrincipleReport(
     questions: core.questions,
     batches: dedupeBatches(batchLinks),
     skipped: mergeSkipped(inPlay, { skipped: core.skipped }),
-    pod: await buildPodOverall(staff, podId, core),
+    pod: await buildPodOverall(staff, podId, selfDefaulted, core),
     podBreakdown: await buildPodBreakdownRows(
       staff,
       core.rawRows,
       new Map(core.authored.map((q) => [q.id, q])),
+      attribution,
     ),
   };
 }

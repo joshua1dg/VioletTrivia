@@ -1119,3 +1119,16 @@ update responses set batch_link_id = '00000000-0000-4000-a000-000000000503'
   where batch_id = '00000000-0000-4000-a000-000000000303'
     and participant_id in ('00000000-0000-4000-a000-000000000411',
                            '00000000-0000-4000-a000-000000000412');
+
+-- Ryan (project lead) also runs a pod (2026-08-11: role is the permission
+-- ceiling; pod-ness is a fact about data). His link on 'Rank and file',
+-- with participant …0403's answers attributed through it — so the
+-- pod-vs-project view and the By pod comparison include a curator-run pod
+-- out of the box.
+insert into batch_links (id, batch_id, owner_id, token) values
+  ('00000000-0000-4000-a000-000000000504', '00000000-0000-4000-a000-000000000302',
+   '00000000-0000-4000-a000-000000000003', 'seed-ryan-rank-lnk');
+
+update responses set batch_link_id = '00000000-0000-4000-a000-000000000504'
+  where batch_id = '00000000-0000-4000-a000-000000000302'
+    and participant_id = '00000000-0000-4000-a000-000000000403';

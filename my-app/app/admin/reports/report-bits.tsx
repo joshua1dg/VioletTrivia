@@ -219,7 +219,11 @@ export function PodSelector({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-[11.5px] tracking-[0.04em] text-faint">POD</span>
-      {chip(basePath, activePodId === null, "Project only")}
+      {/* Explicit sentinel, not the bare path: with no ?pod= the service
+          now defaults a full-scope viewer to their OWN slice (a project
+          lead who runs a pod sees it like a pod lead would), so "no pod"
+          has to be said out loud. */}
+      {chip(`${basePath}?pod=project`, activePodId === null, "Project only")}
       {options.map((opt) =>
         chip(
           `${basePath}?pod=${opt.userId}`,
