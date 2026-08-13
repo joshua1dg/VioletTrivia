@@ -1053,7 +1053,7 @@ update responses set rationale = 'Deleting 2M rows on an assumption is the check
 -- master batch, and pod attribution for some of the fake contestants.
 --
 --   lead@violet.local    / password  — pod_lead
---   project@violet.local / password  — project_lead
+--   project@violet.local / password  — dol
 --
 -- Participants 406–408 (Spot the miss), 409–410 (Rank and file) and
 -- 411–412 (Feedback clinic) are stamped as having come through the pod
@@ -1096,7 +1096,7 @@ insert into auth.identities (
 
 insert into staff (user_id, role, email, display_name) values
   ('00000000-0000-4000-a000-000000000002', 'pod_lead',     'lead@violet.local',    'Sam (pod lead)'),
-  ('00000000-0000-4000-a000-000000000003', 'project_lead', 'project@violet.local', 'Ryan (project lead)');
+  ('00000000-0000-4000-a000-000000000003', 'dol', 'project@violet.local', 'Ryan (DOL)');
 
 insert into batch_links (id, batch_id, owner_id, token) values
   ('00000000-0000-4000-a000-000000000501', '00000000-0000-4000-a000-000000000301',
@@ -1120,7 +1120,7 @@ update responses set batch_link_id = '00000000-0000-4000-a000-000000000503'
     and participant_id in ('00000000-0000-4000-a000-000000000411',
                            '00000000-0000-4000-a000-000000000412');
 
--- Ryan (project lead) also runs a pod (2026-08-11: role is the permission
+-- Ryan (DOL) also runs a pod (2026-08-11: role is the permission
 -- ceiling; pod-ness is a fact about data). His link on 'Rank and file',
 -- with participant …0403's answers attributed through it — so the
 -- pod-vs-project view and the By pod comparison include a curator-run pod

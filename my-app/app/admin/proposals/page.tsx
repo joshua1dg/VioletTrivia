@@ -9,7 +9,7 @@ import { QueueRow } from "./_ui/queue-row";
 
 /**
  * The Proposals tab (Wave 2, propose-to-master). There are no
- * notifications — this screen IS the inbox: project leads and admins work
+ * notifications — this screen IS the inbox: DOLs and admins work
  * the pending pile here ("Pending review", `view.queue` — null, not `[]`,
  * for anyone who isn't a curator, since the section doesn't exist for them
  * rather than merely being empty), and everyone tracks their own
@@ -28,7 +28,7 @@ export default async function ProposalsPage() {
     <>
       <PageHeader
         title="Proposals"
-        meta="Anyone can propose a question; project leads and admins review the pile before it goes live."
+        meta="Anyone can propose a question; DOLs and admins review the pile before it goes live."
         actions={<PrimaryLink href="/admin/questions/new">New question</PrimaryLink>}
       />
 

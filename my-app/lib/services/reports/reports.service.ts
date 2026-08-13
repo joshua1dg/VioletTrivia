@@ -39,7 +39,7 @@ import { buildTopicRows, type TopicRow } from "./topic.util";
  * scope-resolution rule: a pod lead ALWAYS sees their own slice (`?pod=`
  * is ignored outright — the access rule in PODS.md's role matrix: reads
  * are full for everyone, but a pod lead's slice is never someone else's);
- * a project lead/admin sees whatever pod `?pod=` names, or none.
+ * a DOL/admin sees whatever pod `?pod=` names, or none.
  * ------------------------------------------------------------------ */
 
 async function loadPodAttribution(): Promise<PodAttribution> {
@@ -69,7 +69,7 @@ async function loadPodAttribution(): Promise<PodAttribution> {
  * Which pod's slice to show. A pod lead: always their own, no exceptions.
  * A full-scope viewer: whatever `?pod=` names; the sentinel "project"
  * means explicitly none; and NO param defaults to their own slice — a
- * project lead who also runs a pod sees it beside the project numbers
+ * DOL who also runs a pod sees it beside the project numbers
  * just like a pod lead would (the reads drop an empty defaulted slice, so
  * a curator with no pod sees nothing extra).
  */
@@ -85,7 +85,7 @@ function resolvePodScope(
 }
 
 /** "Your pod" for the lead looking at their own slice; the lead's display
- * name (or email) when a project lead/admin picked them via the selector. */
+ * name (or email) when a DOL/admin picked them via the selector. */
 async function podLabel(staff: Staff, podId: string): Promise<string> {
   if (podId === staff.userId) return "Your pod";
   const rows = await staffRepo.list();
@@ -125,7 +125,7 @@ export type PodBreakdownRow = {
 /**
  * Every pod side by side over THIS page's response set — the "how are the
  * pods doing against each other" view (2026-08-11). Full-scope viewers
- * (project leads, admins) only; a pod lead gets null — their own slice is
+ * (DOLs, admins) only; a pod lead gets null — their own slice is
  * the `pod` block, and other pods' slices are not theirs to see. Pods with
  * no attributable answers are omitted, never zero-barred. Best rate first,
  * since the section's whole question is relative standing.
@@ -166,7 +166,7 @@ async function buildPodBreakdownRows(
 
 export type PodOption = { userId: string; label: string };
 
-/** Pod leads, for the selector project leads/admins get on the org
+/** Pod leads, for the selector DOLs/admins get on the org
  * dashboard and the batch report (PODS.md: "sliceable by pod"). */
 export async function listPodOptions(): Promise<PodOption[]> {
   await requireStaff();
@@ -177,7 +177,7 @@ export async function listPodOptions(): Promise<PodOption[]> {
   ]);
   // A "pod" is anyone who could have a slice: every pod lead, plus any
   // curator who holds a pod link or has hosted a session (2026-08-11:
-  // project leads and admins can run pods too).
+  // DOLs and admins can run pods too).
   const owners = new Set<string>([
     ...links.map((l) => l.ownerId),
     ...sessions.flatMap((s) => (s.hostId ? [s.hostId] : [])),
@@ -268,10 +268,10 @@ export type BatchReport = {
   /** Repeat answers (same person, same question — e.g. async + a live
    *  session) dropped before grading; only the first counted. */
   duplicateCount: number;
-  /** null when the viewer has no personal slice (project lead/admin) —
+  /** null when the viewer has no personal slice (DOL/admin) —
    *  the page uses this to decide whether to offer the pod selector. */
   viewerPodScope: string | null;
-  /** Set for a pod lead (always their own), or for a project lead/admin
+  /** Set for a pod lead (always their own), or for a DOL/admin
    *  who picked one via `?pod=`. Same shape as `OrgReport.pod`. */
   pod: PodComparison | null;
   /** Every pod side by side (full-scope viewers only) — see
@@ -392,10 +392,10 @@ export type OrgReport = {
   }[];
   batches: BatchReportSummary[];
   skipped: SkippedRow[];
-  /** null when the viewer has no personal slice (project lead/admin) —
+  /** null when the viewer has no personal slice (DOL/admin) —
    *  the page uses this to decide whether to offer the pod selector. */
   viewerPodScope: string | null;
-  /** Set for a pod lead (always their own), or for a project lead/admin
+  /** Set for a pod lead (always their own), or for a DOL/admin
    *  who picked one via `?pod=`. */
   pod: PodComparison | null;
   /** Every pod side by side (full-scope viewers only) — see

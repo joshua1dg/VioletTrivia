@@ -555,7 +555,7 @@ export type Database = {
       question_status: "draft" | "live" | "archived"
       review_status: "draft" | "proposed" | "approved" | "denied"
       session_phase: "lobby" | "voting" | "locked" | "revealed" | "ended"
-      staff_role: "admin" | "pod_lead" | "project_lead"
+      staff_role: "admin" | "pod_lead" | "dol"
       template_type: "which_principle" | "rank_variants" | "write_feedback"
     }
     CompositeTypes: {
@@ -691,7 +691,7 @@ export const Constants = {
       question_status: ["draft", "live", "archived"],
       review_status: ["draft", "proposed", "approved", "denied"],
       session_phase: ["lobby", "voting", "locked", "revealed", "ended"],
-      staff_role: ["admin", "pod_lead", "project_lead"],
+      staff_role: ["admin", "pod_lead", "dol"],
       template_type: ["which_principle", "rank_variants", "write_feedback"],
     },
   },

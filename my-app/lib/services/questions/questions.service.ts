@@ -4,7 +4,7 @@ import type { ZodType } from "zod";
 
 import {
   canCurateMaster,
-  requireProjectLead,
+  requireDol,
   requireStaff,
   type Staff,
 } from "@/lib/auth";
@@ -161,7 +161,7 @@ export async function listQuestionSummaries(options?: {
 
 /**
  * The Proposals tab, both audiences in one read (2026-08-12): everyone
- * sees their own submissions with verdicts and notes; project leads and
+ * sees their own submissions with verdicts and notes; DOLs and
  * admins additionally get the pending pile. `queue: null` (not `[]`) for
  * pod leads — the section doesn't exist for them, it isn't merely empty.
  */
@@ -236,7 +236,7 @@ function assertCanEdit(
   }
   throw new AppError(
     "forbidden",
-    "Only project leads can edit approved questions.",
+    "Only DOLs can edit approved questions.",
   );
 }
 
@@ -319,10 +319,10 @@ export async function updateQuestion(
 }
 
 /** The normal path for anything that has been seen by a reviewer.
- * Lifecycle is curation — project leads and admins (PODS.md: leads and
+ * Lifecycle is curation — DOLs and admins (PODS.md: leads and
  * above own the master set; requireAdmin here predated the role tiers). */
 export async function archiveQuestion(id: string): Promise<void> {
-  await requireProjectLead();
+  await requireDol();
   await repo.setStatus(id, "archived");
 }
 
@@ -330,7 +330,7 @@ export async function setQuestionStatus(
   id: string,
   status: QuestionStatus,
 ): Promise<void> {
-  await requireProjectLead();
+  await requireDol();
   await repo.setStatus(id, status);
 }
 
@@ -398,7 +398,7 @@ export async function submitQuestionForReview(id: string): Promise<void> {
  * failure mode this avoids. Curators can still demote to draft after.
  */
 export async function approveQuestion(id: string): Promise<void> {
-  const staff = await requireProjectLead();
+  const staff = await requireDol();
   await assertAwaitingReview(id);
   await repo.setReviewDecision(id, {
     reviewStatus: "approved",
@@ -411,7 +411,7 @@ export async function approveQuestion(id: string): Promise<void> {
 /** The note is required: there are no notifications, so the note IS the
  * feedback channel — a bare "denied" teaches the submitter nothing. */
 export async function denyQuestion(id: string, note: string): Promise<void> {
-  const staff = await requireProjectLead();
+  const staff = await requireDol();
   const trimmed = note.trim();
   if (!trimmed) {
     throw new AppError(

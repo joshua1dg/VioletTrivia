@@ -21,10 +21,11 @@ import { AppError } from "@/lib/errors";
  * only via this script (or, later, by another admin inserting a row).
  */
 
-/** `pod_lead | project_lead | admin` (PODS.md, settled 2026-08-11). One
- * project — the app is it — so `project_lead` is a role, not a role plus
- * a grouping table. Derived from the DB enum so a migration can't drift
- * from this type silently. */
+/** `pod_lead | dol | admin` (settled 2026-08-11; the middle tier was
+ * born "project_lead" and renamed to DOL — the org's real term —
+ * 2026-08-13). One project — the app is it — so DOL is a role, not a
+ * role plus a grouping table. Derived from the DB enum so a migration
+ * can't drift from this type silently. */
 export type StaffRole =
   import("@/lib/db/database.types").Database["public"]["Enums"]["staff_role"];
 
@@ -40,15 +41,15 @@ export type Staff = {
  * which analytics slice is yours.
  *
  * - `canCurateMaster` — mutate master batches, and later (Wave 2) review
- *   proposed questions: project leads and admins.
+ *   proposed questions: DOLs and admins.
  * - `canManageBatch` — mutate a given batch: its owner, or anyone who can
  *   curate masters. A batch with no owner is a master batch (the seeds,
  *   and anything created before ownership existed).
  * - `podScopeId` — whose slice this person's analytics filter to; null
- *   means "no personal slice — you see every pod" (project leads, admins).
+ *   means "no personal slice — you see every pod" (DOLs, admins).
  */
 export function canCurateMaster(staff: Staff): boolean {
-  return staff.role === "admin" || staff.role === "project_lead";
+  return staff.role === "admin" || staff.role === "dol";
 }
 
 export function canManageBatch(
@@ -127,21 +128,21 @@ export async function getStaff(): Promise<Staff | null> {
   }
 }
 
-/** Accepts every role — admin ⊃ project lead ⊃ pod lead. Throws
+/** Accepts every role — admin ⊃ DOL ⊃ pod lead. Throws
  * AppError("unauthorized") when not signed in, AppError("forbidden") when
  * signed in but not staff. */
 export async function requireStaff(): Promise<Staff> {
   return resolveStaff();
 }
 
-/** Project leads and admins — the master-content tier (curating master
- * batches; Wave 2 question review). */
-export async function requireProjectLead(): Promise<Staff> {
+/** DOLs and admins — the master-content tier (curating master batches;
+ * Wave 2 question review). */
+export async function requireDol(): Promise<Staff> {
   const staff = await resolveStaff();
   if (!canCurateMaster(staff)) {
     throw new AppError(
       "forbidden",
-      "This action requires a project lead or admin account.",
+      "This action requires a DOL or admin account.",
     );
   }
   return staff;

@@ -37,8 +37,8 @@ export function ReadOnlyBatchView({
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       <div className="rounded-[10px] border border-line-2 bg-surface p-4">
         <p className="text-[13px] leading-[1.6] text-muted-2">
-          Master batch — curated by project leads. You can see everything
-          here, but only a project lead or admin can change it.
+          Master batch — curated by DOLs. You can see everything
+          here, but only a DOL or admin can change it.
         </p>
       </div>
 

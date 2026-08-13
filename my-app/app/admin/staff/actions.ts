@@ -21,7 +21,7 @@ import type { StaffRoleValue } from "@/lib/services/staff";
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
-const roleValues = ["pod_lead", "project_lead", "admin"] as const;
+const roleValues = ["pod_lead", "dol", "admin"] as const;
 const roleInput: z.ZodType<StaffRoleValue> = z.enum(roleValues);
 
 const createStaffInput = z.object({

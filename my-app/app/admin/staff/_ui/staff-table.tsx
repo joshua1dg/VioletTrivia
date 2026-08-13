@@ -22,7 +22,7 @@ const initialState: ActionResult | null = null;
 /** Values stay the enum (`staff_role`); display copy uses spaces. */
 const ROLE_OPTIONS: { value: StaffRoleValue; label: string }[] = [
   { value: "pod_lead", label: "pod lead" },
-  { value: "project_lead", label: "project lead" },
+  { value: "dol", label: "DOL" },
   { value: "admin", label: "admin" },
 ];
 

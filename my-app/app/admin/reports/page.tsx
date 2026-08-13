@@ -23,7 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
  * reports, same as everywhere else.
  *
  * Wave 1 (PODS.md): a pod lead's slice renders beside these project-wide
- * numbers automatically; a project lead/admin picks a pod via `?pod=` and
+ * numbers automatically; a DOL/admin picks a pod via `?pod=` and
  * sees the exact same comparison.
  */
 export default async function OrgReportPage({

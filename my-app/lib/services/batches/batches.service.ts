@@ -25,7 +25,7 @@ import { generateToken } from "./token.util";
  */
 
 /** Loads the batch and throws AppError("forbidden") unless the caller may
- * mutate it — its owner, or a project lead/admin (`canManageBatch`,
+ * mutate it — its owner, or a DOL/admin (`canManageBatch`,
  * PODS.md). Every write below goes through this instead of `requireAdmin()`
  * so a pod lead can edit their own batches without becoming an admin. */
 async function requireManage(id: string): Promise<repo.BatchRow> {
@@ -34,14 +34,14 @@ async function requireManage(id: string): Promise<repo.BatchRow> {
   if (!canManageBatch(staff, batch)) {
     throw new AppError(
       "forbidden",
-      "You can only edit batches you own, or master batches if you're a project lead or admin.",
+      "You can only edit batches you own, or master batches if you're a DOL or admin.",
     );
   }
   return batch;
 }
 
 /** PODS.md's master-batch rule applied to one owner: nobody (null), or a
- * project lead/admin. `staffRepo.list()` rather than a single-row lookup —
+ * DOL/admin. `staffRepo.list()` rather than a single-row lookup —
  * there's no `getById` on the staff repo, and the list is small (staff, not
  * participants). Shared by `listBatches`' OWNER column and `getMyPodLink`'s
  * "not on another lead's batch" guard. */
@@ -322,7 +322,7 @@ export type BatchLink = linksRepo.BatchLinkRow;
  * calls. Only makes sense on a MASTER batch: a lead's own batch already has
  * its own token as its link, and another lead's batch isn't this lead's to
  * link into (PODS.md — "a pod lead may NOT create a pod link on another
- * lead's batch"). Project leads and admins may call this too (harmless —
+ * lead's batch"). DOLs and admins may call this too (harmless —
  * they can already reach the batch through its canonical token, but nothing
  * about this action needs restricting further for them).
  */

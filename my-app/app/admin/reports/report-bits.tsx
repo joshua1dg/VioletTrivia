@@ -186,7 +186,7 @@ export function PodBreakdownList({
 }
 
 /**
- * The pod filter for project leads/admins on the org dashboard and batch
+ * The pod filter for DOLs/admins on the org dashboard and batch
  * report (PODS.md: "sliceable by pod") — server-driven via `?pod=`, same
  * pattern as `/admin/questions?topic=`. A pod lead never sees this; their
  * own scope is always what the service returns, regardless of the URL.
