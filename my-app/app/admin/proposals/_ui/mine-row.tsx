@@ -13,22 +13,55 @@
 // plain serializable prop instead, which is fine.
 
 import Link from "next/link";
+import { useState, useTransition } from "react";
 
-import { ConfirmDelete } from "@/components/feedback";
+import { ConfirmDelete, ErrorNote, SubmitButton, toErrorLike, type ErrorLike } from "@/components/feedback";
 import type { QuestionSummary } from "@/lib/services/questions";
 
-import { withdrawQuestion } from "../actions";
+import { submitQuestionForReview, withdrawQuestion } from "../actions";
 import { ReviewStatusChip } from "./review-status-chip";
 
+/** Draft is private work-in-progress, never yet in front of a reviewer — its
+ *  Edit link reads plainly rather than implying a resubmit that hasn't
+ *  happened. Proposed is already in the queue, so Edit alone. Denied keeps
+ *  "Edit & resubmit" — the resubmit itself is now an explicit button inside
+ *  the editor (other agent's work), not implied by saving. */
+const EDIT_LABEL: Record<QuestionSummary["reviewStatus"], string> = {
+  draft: "Edit",
+  proposed: "Edit",
+  denied: "Edit & resubmit",
+  approved: "View report",
+};
+
 /**
- * One row of the viewer's own submissions: proposed and denied always,
- * approved too for anyone who isn't a curator (getProposalsView already
- * filtered a curator's own direct-to-library work out — see its comment).
- * Denied rows surface the reviewer's note prominently since there are no
- * notifications; this row IS where the submitter finds out why.
+ * One row of the viewer's own submissions: draft, proposed and denied
+ * always, approved too for anyone who isn't a curator (getProposalsView
+ * already filtered a curator's own direct-to-library work out — see its
+ * comment). Denied rows surface the reviewer's note prominently since there
+ * are no notifications; this row IS where the submitter finds out why.
+ *
+ * Draft rows (2026-08-13, the explicit-submit model) get a "Submit for
+ * review" button — the one way a draft crosses into the queue, since saving
+ * the editor no longer does it implicitly.
  */
 export function MineRow({ question }: { question: QuestionSummary }) {
   const canWithdraw = question.reviewStatus !== "approved";
+  const canSubmit = question.reviewStatus === "draft";
+
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<ErrorLike | null>(null);
+
+  function submit() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await submitQuestionForReview(question.id);
+        if (!result.ok) setError(result.message);
+      } catch (e) {
+        setError(toErrorLike(e));
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2.5 border-b border-line-3 px-4 py-3.5 last:border-b-0">
@@ -43,20 +76,20 @@ export function MineRow({ question }: { question: QuestionSummary }) {
           <ReviewStatusChip status={question.reviewStatus} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {question.reviewStatus === "approved" ? (
-            <Link
-              href={`/admin/questions/${question.id}/report`}
-              className="rounded-[7px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
-            >
-              View report
-            </Link>
-          ) : (
-            <Link
-              href={`/admin/questions/${question.id}`}
-              className="rounded-[7px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
-            >
-              Edit &amp; resubmit
-            </Link>
+          <Link
+            href={
+              question.reviewStatus === "approved"
+                ? `/admin/questions/${question.id}/report`
+                : `/admin/questions/${question.id}`
+            }
+            className="rounded-[7px] border border-line px-3.5 py-2 text-[13px] text-ink-4 transition-colors hover:bg-surface"
+          >
+            {EDIT_LABEL[question.reviewStatus]}
+          </Link>
+          {canSubmit && (
+            <SubmitButton type="button" onClick={submit} pending={pending}>
+              Submit for review
+            </SubmitButton>
           )}
           {canWithdraw && (
             <ConfirmDelete
@@ -69,6 +102,8 @@ export function MineRow({ question }: { question: QuestionSummary }) {
           )}
         </div>
       </div>
+
+      <ErrorNote error={error} />
 
       {question.reviewStatus === "denied" && question.reviewNote && (
         <div className="rounded-[8px] border border-bad-line bg-bad-tint px-3 py-2">

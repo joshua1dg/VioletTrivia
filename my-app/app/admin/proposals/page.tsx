@@ -52,8 +52,8 @@ export default async function ProposalsPage() {
         <Section title="Your proposals">
           {view.mine.length === 0 ? (
             <p className="px-2 py-2 text-[13px] leading-[1.6] text-muted-3">
-              You haven&apos;t proposed any questions yet — start one from
-              the{" "}
+              You haven&apos;t drafted or proposed any questions yet — start
+              one from the{" "}
               <Link
                 href="/admin/questions/new"
                 className="text-violet-ink hover:underline"

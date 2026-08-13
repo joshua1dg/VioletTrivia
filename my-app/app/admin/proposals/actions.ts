@@ -59,3 +59,16 @@ export async function withdrawQuestion(id: string): Promise<VoidResult> {
     return { ok: false, message: asAppError(error).userMessage };
   }
 }
+
+/** The explicit draft/denied → proposed step (2026-08-13) — replaces the
+ *  old implicit resubmit-on-save. Author or curator only, draft or denied
+ *  only; the service turns anything else into a `conflict`. */
+export async function submitQuestionForReview(id: string): Promise<VoidResult> {
+  try {
+    await questions.submitQuestionForReview(z.uuid().parse(id));
+    revalidatePath("/admin/proposals");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: asAppError(error).userMessage };
+  }
+}
