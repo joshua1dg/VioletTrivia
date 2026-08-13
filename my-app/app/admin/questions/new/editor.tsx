@@ -1,6 +1,12 @@
 "use client";
 
-import { startTransition, useActionState, useState, useTransition } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -33,6 +39,7 @@ import {
   archiveQuestion,
   createQuestion,
   deleteQuestion,
+  submitQuestionForReview,
   updateQuestion,
   type ActionResult,
 } from "../actions";
@@ -168,6 +175,7 @@ export function QuestionEditor({
   principles,
   initial,
   canCurate,
+  initialSubmitError,
 }: {
   mode: "new" | "edit";
   /** Required when mode === "edit". */
@@ -175,12 +183,18 @@ export function QuestionEditor({
   topics: Topic[];
   principles: PrincipleOption[];
   initial?: EditableQuestion;
-  /** `canCurateMaster(staff)`, computed server-side by the page — the only
-   *  role fact this form needs. A curator's save lands wherever they point
-   *  it; anyone else's is forced to draft/proposed by the service regardless
-   *  of what this form shows, so the UI here is discoverability, not
-   *  security (Wave 2, PODS.md). */
+  /** `canCurateMaster(staff)`, computed server-side by the page. Everyone
+   *  now drafts the same way (2026-08-13) — this only still matters for the
+   *  lifecycle buttons (Save draft/Save & publish/Archive/Delete) on an
+   *  already-APPROVED question, which only a curator can reach at all
+   *  (`assertCanEdit`). The UI here is discoverability, not security. */
   canCurate: boolean;
+  /** Set by `[id]/page.tsx` from `?submitError=1` — the one case where a
+   *  save-then-submit chain (from the `new` page) succeeded at the save but
+   *  failed at the submit. The row exists as a draft either way; this just
+   *  tells the freshly-landed edit page to say so, since the client state
+   *  that saw the failure didn't survive the navigation. */
+  initialSubmitError?: boolean;
 }) {
   const router = useRouter();
 
@@ -212,14 +226,11 @@ export function QuestionEditor({
 
   const codes = principleCodesFor(template, content);
 
-  const action = mode === "edit" ? updateQuestion : createQuestion;
-  const [state, dispatch, pending] = useActionState<ActionResult | null, unknown>(
-    action,
-    null,
-  );
+  const reviewStatus = initial?.reviewStatus;
+  const isApproved = reviewStatus === "approved";
 
-  function save(status: QuestionStatusInput) {
-    const payload = {
+  function buildPayload(status: QuestionStatusInput) {
+    return {
       ...(mode === "edit" && id ? { id } : {}),
       template,
       prompt,
@@ -228,21 +239,92 @@ export function QuestionEditor({
       status,
       topicIds,
     };
-    startTransition(() => dispatch(payload));
+  }
+
+  // Pure save, no review-status change (2026-08-13: saving never moves the
+  // review needle any more). Drives every plain "Save…" button — the
+  // lifecycle buttons on an approved question, "Save (stays in review)" on
+  // a proposed one, and the ghost "Save"/"Save draft" beside the
+  // save-then-submit buttons below.
+  const action = mode === "edit" ? updateQuestion : createQuestion;
+  const [state, dispatch, pending] = useActionState<ActionResult | null, unknown>(
+    action,
+    null,
+  );
+
+  function save(status: QuestionStatusInput) {
+    startTransition(() => dispatch(buildPayload(status)));
   }
 
   const saveError = state && !state.ok ? state.message : null;
   const saved = mode === "edit" && state?.ok === true;
 
-  // Non-curators never choose a destination status — the service forces
-  // draft/proposed regardless of what this form sends (Wave 2). The button
-  // copy says what saving actually does instead of offering a dead choice.
-  const nonCuratorSaveLabel =
-    mode === "new"
-      ? "Submit for review"
-      : initial?.reviewStatus === "denied"
-        ? "Resubmit for review"
-        : "Save (stays in review)";
+  // `new` mode has no server redirect any more (createQuestion just returns
+  // `{ ok, id }`, same shape as updateQuestion, so the save-then-submit
+  // chain below can read the new id back out). "Save draft" still lands on
+  // the edit page afterward — just via client navigation instead of a
+  // server-side `redirect()`.
+  useEffect(() => {
+    if (mode === "new" && state?.ok) {
+      router.push(`/admin/questions/${state.id}`);
+    }
+  }, [mode, state, router]);
+
+  // The save-then-submit chain (2026-08-13): submitting is now its own
+  // explicit step (`submitQuestionForReview`), never implicit in a save. The
+  // "submit" buttons still read as one click, so they chain a save and the
+  // submit client-side rather than leaving unsaved edits behind — silently
+  // submitting stale content would be worse than the extra round trip.
+  // Shared by both the `new`-mode and `edit`-mode (draft/denied) submit
+  // buttons; only one is ever mounted at a time.
+  const [combinedPending, startCombined] = useTransition();
+  const [combinedError, setCombinedError] = useState<ErrorLike | null>(null);
+  const [combinedNotice, setCombinedNotice] = useState<string | null>(null);
+
+  function handleCreateAndSubmit() {
+    setCombinedError(null);
+    setCombinedNotice(null);
+    startCombined(async () => {
+      const created = await createQuestion(null, buildPayload("draft"));
+      if (!created.ok) {
+        setCombinedError(created.message);
+        return;
+      }
+      // The row exists as a draft from here on regardless of what happens
+      // next — always land on its edit page rather than leaving this `new`
+      // form mounted, which would create a second row on another click.
+      const submitted = await submitQuestionForReview(created.id);
+      router.push(
+        submitted.ok
+          ? `/admin/questions/${created.id}`
+          : `/admin/questions/${created.id}?submitError=1`,
+      );
+    });
+  }
+
+  function handleUpdateAndSubmit() {
+    if (!id) return;
+    setCombinedError(null);
+    setCombinedNotice(null);
+    startCombined(async () => {
+      const savedResult = await updateQuestion(null, buildPayload("draft"));
+      if (!savedResult.ok) {
+        setCombinedError(savedResult.message);
+        return;
+      }
+      const submitted = await submitQuestionForReview(id);
+      if (submitted.ok) {
+        setCombinedNotice("Submitted for review.");
+        // Pulls fresh `reviewStatus`/`reviewNote` from the server — this
+        // component reads those straight off `initial` rather than local
+        // state, so the refreshed props are enough to flip the status line
+        // and button set without a full remount.
+        router.refresh();
+      } else {
+        setCombinedError(submitted.message);
+      }
+    });
+  }
 
   const [archivePending, startArchive] = useTransition();
   const [archiveError, setArchiveError] = useState<ErrorLike | null>(null);
@@ -287,12 +369,16 @@ export function QuestionEditor({
             membership is batch_questions, and it's composed on the Batches
             screen against the whole library. */}
         <div className="flex items-center gap-2.5">
-          {!canCurate && mode === "edit" && initial && (
+          {mode === "edit" && initial && reviewStatus !== "approved" && (
             <span className="text-[12.5px] font-medium text-muted-3">
-              {initial.reviewStatus === "denied" ? "Denied" : "Pending review"}
+              {reviewStatus === "denied"
+                ? "Denied"
+                : reviewStatus === "draft"
+                  ? "Draft — not submitted"
+                  : "Pending review"}
             </span>
           )}
-          {canCurate && mode === "edit" && id && initial?.status !== "archived" && (
+          {canCurate && mode === "edit" && id && isApproved && initial?.status !== "archived" && (
             <SubmitButton
               type="button"
               variant="ghost"
@@ -302,22 +388,26 @@ export function QuestionEditor({
               Archive
             </SubmitButton>
           )}
-          {canCurate && mode === "edit" && id && (
+          {canCurate && mode === "edit" && id && isApproved && (
             <ConfirmDelete
               title="Delete this question?"
               description="Permanent, and only succeeds if nobody has answered it yet. An answered question is refused — archive it instead."
               onConfirm={handleDelete}
             />
           )}
-          {!canCurate && mode === "edit" && id && (
+          {mode === "edit" && id && !isApproved && (
             <ConfirmDelete
-              triggerLabel="Withdraw proposal"
-              title="Withdraw this proposal?"
-              description="Permanent — once withdrawn, you'd need to submit it again from scratch."
+              triggerLabel={reviewStatus === "draft" ? "Delete draft" : "Withdraw proposal"}
+              title={
+                reviewStatus === "draft"
+                  ? "Delete this draft?"
+                  : "Withdraw this proposal?"
+              }
+              description="Permanent — once removed, you'd need to start over."
               onConfirm={handleDelete}
             />
           )}
-          {canCurate ? (
+          {mode === "edit" && isApproved ? (
             <>
               <SubmitButton
                 type="button"
@@ -328,18 +418,56 @@ export function QuestionEditor({
                 Save draft
               </SubmitButton>
               <SubmitButton type="button" pending={pending} onClick={() => save("live")}>
-                {mode === "edit" ? "Save & publish" : "Publish"}
+                Save & publish
+              </SubmitButton>
+            </>
+          ) : reviewStatus === "proposed" ? (
+            <SubmitButton type="button" pending={pending} onClick={() => save("draft")}>
+              Save (stays in review)
+            </SubmitButton>
+          ) : mode === "new" ? (
+            <>
+              <SubmitButton
+                type="button"
+                variant="ghost"
+                pending={pending}
+                onClick={() => save("draft")}
+              >
+                Save draft
+              </SubmitButton>
+              <SubmitButton
+                type="button"
+                pending={combinedPending}
+                onClick={handleCreateAndSubmit}
+              >
+                Save & submit for review
               </SubmitButton>
             </>
           ) : (
-            <SubmitButton type="button" pending={pending} onClick={() => save("draft")}>
-              {nonCuratorSaveLabel}
-            </SubmitButton>
+            // mode === "edit", reviewStatus draft or denied — save-then-submit
+            // chains rather than an implicit resubmit-on-save (2026-08-13).
+            <>
+              <SubmitButton
+                type="button"
+                variant="ghost"
+                pending={pending}
+                onClick={() => save("draft")}
+              >
+                {reviewStatus === "denied" ? "Save" : "Save draft"}
+              </SubmitButton>
+              <SubmitButton
+                type="button"
+                pending={combinedPending}
+                onClick={handleUpdateAndSubmit}
+              >
+                {reviewStatus === "denied" ? "Resubmit for review" : "Submit for review"}
+              </SubmitButton>
+            </>
           )}
         </div>
       </header>
 
-      {!canCurate && mode === "edit" && initial?.reviewStatus === "denied" && (
+      {mode === "edit" && reviewStatus === "denied" && initial?.reviewNote && (
         <div className="mx-6 mt-4 flex flex-col gap-1.5 rounded-[10px] border border-violet-line-2 bg-violet-tint-2 px-4 py-3.5">
           <p className="text-[12.5px] font-semibold text-violet-ink">
             Denied by the roundtable:
@@ -347,23 +475,27 @@ export function QuestionEditor({
           <p className="text-[13px] leading-[1.55] text-violet-ink">
             {initial.reviewNote}
           </p>
-          <p className="text-[12px] text-muted-3">
-            Saving will resubmit this question for review.
-          </p>
         </div>
       )}
 
-      {canCurate && mode === "edit" && initial?.reviewStatus === "proposed" && (
-        <p className="px-6 pt-4 text-[12px] text-muted-3">
-          Proposed — awaiting review.
-        </p>
-      )}
-
-      {(saveError || archiveError || saved) && (
+      {(saveError ||
+        archiveError ||
+        saved ||
+        combinedError ||
+        combinedNotice ||
+        initialSubmitError) && (
         <div className="flex flex-col gap-2 px-6 pt-4">
           <ErrorNote error={saveError} />
           <ErrorNote error={archiveError} />
+          <ErrorNote error={combinedError} />
+          {initialSubmitError && (
+            <ErrorNote
+              error="Saved as a draft, but submitting it for review failed. Try again below."
+              tone="warn"
+            />
+          )}
           {saved && <ErrorNote error="Saved." tone="neutral" />}
+          {combinedNotice && <ErrorNote error={combinedNotice} tone="neutral" />}
         </div>
       )}
 

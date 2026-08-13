@@ -5,20 +5,22 @@
  *
  * Every export here is: guard (inside the service — a Server Action is a
  * public endpoint, not rendering a button protects nothing) → zod parse →
- * one service call → return. Errors are RETURN VALUES, never throws —
- * `redirect` on a successful create is the one accepted exception, and it
- * runs after the mutating call has already succeeded.
+ * one service call → return. Errors are RETURN VALUES, never throws.
  *
  * `createQuestion` / `updateQuestion` are shaped for React 19
  * `useActionState`: `(previousState, payload)`, payload a plain object
  * rather than `FormData` — content and answerKey are structured, not form
  * fields — mirroring `app/b/actions.ts:submitAsyncAnswer` (PLAN §6).
- * `archiveQuestion` / `deleteQuestion` are called imperatively (a click
- * handler / `<ConfirmDelete onConfirm>`), so they just take an id.
+ * `createQuestion` used to `redirect()` on success; since 2026-08-13 the
+ * editor can chain a save into `submitQuestionForReview`, which needs the
+ * new id back on the client, so it now returns `{ ok: true, id }` like
+ * `updateQuestion` and the client navigates itself.
+ * `archiveQuestion` / `deleteQuestion` / `submitQuestionForReview` are
+ * called imperatively (a click handler / `<ConfirmDelete onConfirm>`), so
+ * they just take an id.
  */
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { asAppError } from "@/lib/errors";
@@ -37,15 +39,14 @@ export async function createQuestion(
   _previousState: ActionResult | null,
   payload: unknown,
 ): Promise<ActionResult> {
-  let id: string;
   try {
     const input = questionInput.parse(payload);
-    id = (await questions.createQuestion(input)).id;
+    const { id } = await questions.createQuestion(input);
+    revalidatePath("/admin/questions");
+    return { ok: true, id };
   } catch (error) {
     return { ok: false, message: asAppError(error).userMessage };
   }
-  revalidatePath("/admin/questions");
-  redirect(`/admin/questions/${id}`);
 }
 
 export async function updateQuestion(
@@ -81,6 +82,21 @@ export async function deleteQuestion(id: string): Promise<VoidResult> {
   try {
     await questions.deleteQuestion(z.uuid().parse(id));
     revalidatePath("/admin/questions");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: asAppError(error).userMessage };
+  }
+}
+
+/** The explicit draft/denied → proposed step (2026-08-13) — the editor's
+ *  "Submit"/"Resubmit for review" buttons. Revalidates the Proposals tab
+ *  too: that's where the row shows up next. */
+export async function submitQuestionForReview(id: string): Promise<VoidResult> {
+  try {
+    await questions.submitQuestionForReview(z.uuid().parse(id));
+    revalidatePath("/admin/questions");
+    revalidatePath(`/admin/questions/${id}`);
+    revalidatePath("/admin/proposals");
     return { ok: true };
   } catch (error) {
     return { ok: false, message: asAppError(error).userMessage };

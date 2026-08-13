@@ -23,13 +23,21 @@ import { QuestionEditor } from "../new/editor";
  * approved. Caught here rather than left to propagate — same pattern as
  * `app/admin/staff/page.tsx` — so a stale link renders a plain access note
  * (200) instead of the generic error boundary.
+ *
+ * `?submitError=1` (2026-08-13): the `new` page's "Save & submit for
+ * review" chains a save into `submitQuestionForReview` client-side. If the
+ * save succeeds but the submit fails, the row already exists — the client
+ * lands here (never back on the `new` form, which would create a second
+ * row on a retry) rather than losing the error on navigation.
  */
 export default async function EditQuestionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ submitError?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const staff = await requireStaff();
 
   let question;
@@ -69,6 +77,7 @@ export default async function EditQuestionPage({
         descriptor: p.shortDescriptor ?? undefined,
       }))}
       initial={question}
+      initialSubmitError={sp.submitError === "1"}
     />
   );
 }
