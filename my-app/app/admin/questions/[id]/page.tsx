@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { PageHeader } from "@/components/admin/ui";
 import { canCurateMaster, requireStaff } from "@/lib/auth";
 import { asAppError, isAppError } from "@/lib/errors";
@@ -34,6 +36,9 @@ export default async function EditQuestionPage({
   try {
     question = await getForEditor(id);
   } catch (error) {
+    // A deleted/withdrawn question's URL (a stale proposals row, a shared
+    // link) is a 404, not a crash — withdrawal makes this path routine.
+    if (isAppError(error) && error.kind === "not_found") notFound();
     if (isAppError(error) && error.kind === "forbidden") {
       return (
         <>
