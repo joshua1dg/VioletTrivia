@@ -4,6 +4,7 @@ import type {
   AnswerKeyOf,
   HydratedContent,
   QuestionStatus,
+  ReviewStatus,
   StoredContent,
   StoredQuestion,
   StoredQuestionWithKey,
@@ -51,6 +52,8 @@ export type AuthoredQuestion = {
     content: HydratedContent<T>;
     answerKey: AnswerKeyOf<T>;
     authorId: string | null;
+    reviewStatus: ReviewStatus;
+    reviewNote: string | null;
   };
 }[TemplateKey];
 
@@ -170,6 +173,8 @@ export function hydrateQuestionWithKey(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     authorId: row.authorId,
+    reviewStatus: row.reviewStatus,
+    reviewNote: row.reviewNote,
     answerKey: row.answerKey,
     content: hydrateContent(row.template, row.content, principles),
   } as AuthoredQuestion;

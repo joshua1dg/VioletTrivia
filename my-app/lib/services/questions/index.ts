@@ -24,9 +24,14 @@ export {
   archiveQuestion,
   setQuestionStatus,
   deleteQuestion,
+  approveQuestion,
+  denyQuestion,
+  getProposalsView,
   type EditableQuestion,
+  type ProposalsView,
   type QuestionStatus,
   type QuestionSummary,
+  type ReviewStatus,
 } from "./questions.service";
 
 export type {

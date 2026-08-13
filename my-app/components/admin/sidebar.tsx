@@ -17,6 +17,9 @@ import { signOut } from "@/app/login/actions";
 
 const NAV = [
   { href: "/admin/questions", label: "Questions" },
+  // Everyone: your submissions and their verdicts; project leads and
+  // admins additionally see the pending pile here (Wave 2).
+  { href: "/admin/proposals", label: "Proposals" },
   { href: "/admin/topics", label: "Topics" },
   // Not in the design, and it has to be: which_principle questions reference
   // rubric codes by foreign key, so nothing can be authored until these exist.

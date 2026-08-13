@@ -1132,3 +1132,90 @@ insert into batch_links (id, batch_id, owner_id, token) values
 update responses set batch_link_id = '00000000-0000-4000-a000-000000000504'
   where batch_id = '00000000-0000-4000-a000-000000000302'
     and participant_id = '00000000-0000-4000-a000-000000000403';
+
+-- ---------------------------------------------------------------------
+-- Wave 2 · Proposals (2026-08-12). Sam (pod lead) has two questions in
+-- the review flow: one waiting on the roundtable, one denied by Ryan
+-- with the why-note. Both are review-dimension demos — status stays
+-- 'draft', so even a filter slip can't surface them to participants.
+-- Junctions mirror what createQuestion writes on save (codes from
+-- inPlayCodes, the picked topic), same as every seeded question above.
+-- ---------------------------------------------------------------------
+
+insert into questions (id, template, prompt, content, answer_key, status,
+                       author_id, review_status, review_note, reviewed_by, reviewed_at) values
+
+-- 225 · pending — Sam proposes a C4 correction-handling question
+('00000000-0000-4000-a000-000000000225', 'which_principle',
+ 'The user corrects the assistant and gets this. Which principle does the response miss most?',
+ $j${
+  "notePrompt": "Why did you pick that one?",
+  "turns": [
+    {"role":"user","body":"That's not right — the deadline moved to Friday, I told you that earlier.","meta":"turn 4"},
+    {"role":"assistant","body":"As I mentioned, my information was based on what was originally provided. If the deadline has changed, I can of course adjust the plan accordingly."}
+  ],
+  "inPlayCodes": ["C2","C4","I2","V2"],
+  "options": [
+    {"id":"C2","principleCode":"C2"},
+    {"id":"C4","principleCode":"C4"},
+    {"id":"I2","principleCode":"I2"},
+    {"id":"V2","principleCode":"V2"}
+  ]
+ }$j$::jsonb,
+ $j${
+  "key":"C4",
+  "perOption":{
+    "C4":["'As I mentioned' deflects the correction back at the user instead of absorbing it.","The version that works takes the new fact on board without defending the old one: 'Got it — Friday. Here's the adjusted plan.'"],
+    "C2":["The user is mildly annoyed, but the reply's failure isn't missing the feeling — it's arguing with the correction."],
+    "I2":["Nothing is fabricated; the assistant really was given the earlier date. The problem is posture, not honesty."],
+    "V2":["The wording is stiff, but tightening the prose wouldn't fix the defensiveness — C4 is the primary miss."]
+  },
+  "summary":"When corrected, absorb and move — never open with a defense of the earlier answer."
+ }$j$::jsonb,
+ 'draft',
+ '00000000-0000-4000-a000-000000000002', 'proposed', null, null, null),
+
+-- 226 · denied — too close to seeded 201; Ryan's note says why
+('00000000-0000-4000-a000-000000000226', 'which_principle',
+ 'The user is upset about repeated failures. What does this reply get wrong?',
+ $j${
+  "notePrompt": "Why did you pick that one?",
+  "turns": [
+    {"role":"user","body":"This is the third time it's broken. Honestly losing patience here.","meta":"turn 9"},
+    {"role":"assistant","body":"I have corrected the configuration error and the pipeline is now running. The fix was straightforward."}
+  ],
+  "inPlayCodes": ["C1","C2","C4","V2"],
+  "options": [
+    {"id":"C1","principleCode":"C1"},
+    {"id":"C2","principleCode":"C2"},
+    {"id":"C4","principleCode":"C4"},
+    {"id":"V2","principleCode":"V2"}
+  ]
+ }$j$::jsonb,
+ $j${
+  "key":"C2",
+  "perOption":{
+    "C2":["Third failure, stated frustration — and the reply is the same flat status update it would send on a first try that worked."],
+    "C1":["The user does learn the state of things; scope isn't the miss."],
+    "C4":["'Straightforward' brushes close to condescension, but the primary failure is not registering the frustration at all."],
+    "V2":["The prose is serviceable; warmer wording alone would not fix ignoring the user's state."]
+  },
+  "summary":"Repeated failures raise the emotional stakes — the response has to acknowledge that before reporting status."
+ }$j$::jsonb,
+ 'draft',
+ '00000000-0000-4000-a000-000000000002', 'denied',
+ 'Roundtable 8/12: this is nearly the same scenario as the frustrated-user question already in the library (201) — same codes in play, same key. Rework it around a different C2 shape (e.g. an excited user getting a flat reply) and resubmit.',
+ '00000000-0000-4000-a000-000000000003', now());
+
+insert into question_principles (question_id, principle_id)
+select q.id, p.id
+from (values
+  ('00000000-0000-4000-a000-000000000225'::uuid, array['C2','C4','I2','V2']),
+  ('00000000-0000-4000-a000-000000000226'::uuid, array['C1','C2','C4','V2'])
+) as links(question_id, codes)
+join questions q on q.id = links.question_id
+join principles p on p.code = any(links.codes);
+
+insert into question_topics (question_id, topic_id) values
+  ('00000000-0000-4000-a000-000000000225', '00000000-0000-4000-a000-000000000101'),
+  ('00000000-0000-4000-a000-000000000226', '00000000-0000-4000-a000-000000000101');

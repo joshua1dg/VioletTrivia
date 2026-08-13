@@ -2,10 +2,16 @@ import "server-only";
 
 import type { ZodType } from "zod";
 
-import { requireAdmin } from "@/lib/auth";
+import {
+  canCurateMaster,
+  requireProjectLead,
+  requireStaff,
+  type Staff,
+} from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import * as repo from "@/lib/repos/questions";
 import type { StoredContent } from "@/lib/repos/questions";
+import * as staffRepo from "@/lib/repos/staff";
 import type { ListResult } from "@/lib/repos/_shared";
 import type { QuestionInput } from "@/lib/schemas/questions";
 import * as principles from "@/lib/services/principles";
@@ -24,6 +30,7 @@ import {
 } from "./hydrate.util";
 
 export type QuestionStatus = repo.QuestionStatus;
+export type ReviewStatus = repo.ReviewStatus;
 
 /* ------------------------------------------------------------------ *
  * Reads
@@ -92,6 +99,13 @@ export type QuestionSummary = {
   prompt: string;
   excerpt: string;
   status: QuestionStatus;
+  reviewStatus: ReviewStatus;
+  /** The roundtable's "why" — shown to the submitter on denial. */
+  reviewNote: string | null;
+  authorId: string | null;
+  /** displayName ?? email, resolved from the staff list; null for
+   * authorless rows (seeds) or departed staff. */
+  authorLabel: string | null;
   topicIds: string[];
   topicSlugs: string[];
   principleCodes: string[];
@@ -99,26 +113,87 @@ export type QuestionSummary = {
   updatedAt: string;
 };
 
+/**
+ * SAFE BY DEFAULT: with no `reviewStatuses`, only approved questions come
+ * back — the library, the batch composer, the topic views all get the
+ * vetted set without having to remember to ask for it. The Proposals tab
+ * is the one caller that passes an explicit review filter.
+ */
 export async function listQuestionSummaries(options?: {
   statuses?: QuestionStatus[];
+  reviewStatuses?: ReviewStatus[];
+  authorId?: string;
 }): Promise<ListResult<QuestionSummary>> {
-  const result = await repo.listSummaries(options);
+  const [result, staffRows] = await Promise.all([
+    repo.listSummaries({
+      ...options,
+      reviewStatuses: options?.reviewStatuses ?? ["approved"],
+    }),
+    staffRepo.list(),
+  ]);
+
+  const staffById = new Map(staffRows.map((row) => [row.userId, row]));
 
   return {
-    rows: result.rows.map((row) => ({
-      id: row.id,
-      template: row.template,
-      templateLabel: registry[row.template].label,
-      prompt: row.prompt,
-      excerpt: excerptFrom(row.content),
-      status: row.status,
-      topicIds: row.topicIds,
-      topicSlugs: row.topicSlugs,
-      principleCodes: row.principleCodes,
-      responseCount: row.responseCount,
-      updatedAt: row.updatedAt,
-    })),
+    rows: result.rows.map((row) => {
+      const author = row.authorId ? staffById.get(row.authorId) : undefined;
+      return {
+        id: row.id,
+        template: row.template,
+        templateLabel: registry[row.template].label,
+        prompt: row.prompt,
+        excerpt: excerptFrom(row.content),
+        status: row.status,
+        reviewStatus: row.reviewStatus,
+        reviewNote: row.reviewNote,
+        authorId: row.authorId,
+        authorLabel: author ? (author.displayName ?? author.email) : null,
+        topicIds: row.topicIds,
+        topicSlugs: row.topicSlugs,
+        principleCodes: row.principleCodes,
+        responseCount: row.responseCount,
+        updatedAt: row.updatedAt,
+      };
+    }),
     skipped: result.skipped,
+  };
+}
+
+/**
+ * The Proposals tab, both audiences in one read (2026-08-12): everyone
+ * sees their own submissions with verdicts and notes; project leads and
+ * admins additionally get the pending pile. `queue: null` (not `[]`) for
+ * pod leads — the section doesn't exist for them, it isn't merely empty.
+ */
+export type ProposalsView = {
+  viewerCanReview: boolean;
+  mine: QuestionSummary[];
+  queue: QuestionSummary[] | null;
+};
+
+export async function getProposalsView(): Promise<ProposalsView> {
+  const staff = await requireStaff();
+  const reviewer = canCurateMaster(staff);
+
+  const [mine, queue] = await Promise.all([
+    listQuestionSummaries({
+      authorId: staff.userId,
+      reviewStatuses: ["proposed", "denied", "approved"],
+    }),
+    reviewer
+      ? listQuestionSummaries({ reviewStatuses: ["proposed"] })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    viewerCanReview: reviewer,
+    // A curator's own direct-to-library work is born approved with no
+    // reviewer; showing it under "your proposals" would be noise. Keep
+    // rows that went through review (have a verdict trail) or await one.
+    mine: mine.rows.filter(
+      (row) => row.reviewStatus !== "approved" || !reviewer,
+    ),
+    queue: queue ? queue.rows : null,
   };
 }
 
@@ -129,7 +204,7 @@ export type EditableQuestion = AuthoredQuestion & {
 };
 
 export async function getForEditor(id: string): Promise<EditableQuestion> {
-  await requireAdmin();
+  const staff = await requireStaff();
 
   const [question, topicIds, principleCodes] = await Promise.all([
     getWithKey(id),
@@ -137,7 +212,32 @@ export async function getForEditor(id: string): Promise<EditableQuestion> {
     repo.listPrincipleCodesFor(id),
   ]);
 
+  assertCanEdit(staff, question);
+
   return { ...question, topicIds, principleCodes };
+}
+
+/**
+ * Who may open/save a question (Wave 2): curators, always; anyone else
+ * only their OWN work while it still awaits the roundtable (proposed or
+ * denied). Once approved it is master content — a submitter editing it
+ * after the fact would un-vet it silently.
+ */
+function assertCanEdit(
+  staff: Staff,
+  question: { authorId: string | null; reviewStatus: repo.ReviewStatus },
+): void {
+  if (canCurateMaster(staff)) return;
+  if (
+    question.authorId === staff.userId &&
+    question.reviewStatus !== "approved"
+  ) {
+    return;
+  }
+  throw new AppError(
+    "forbidden",
+    "Only project leads can edit approved questions.",
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -157,16 +257,23 @@ export async function getForEditor(id: string): Promise<EditableQuestion> {
 export async function createQuestion(
   input: QuestionInput,
 ): Promise<{ id: string }> {
-  const staff = await requireAdmin();
+  const staff = await requireStaff();
+  const curator = canCurateMaster(staff);
 
   const { storedContent, answerKey, principleCodes } = await validate(input);
 
+  // Same form for everyone; the ROLE decides where it lands (Wave 2).
+  // A curator's question goes wherever they pointed it. Anyone else's is
+  // forced into the pile: review_status 'proposed', lifecycle 'draft' —
+  // whatever status the client claimed. A Server Action is a public
+  // endpoint; the forcing happens here, not in the form.
   const { id } = await repo.insert({
     template: input.template,
     prompt: input.prompt,
     content: storedContent,
     answerKey,
-    status: input.status,
+    status: curator ? input.status : "draft",
+    reviewStatus: curator ? "approved" : "proposed",
     authorId: staff.userId,
   });
 
@@ -181,7 +288,10 @@ export async function updateQuestion(
   id: string,
   input: QuestionInput,
 ): Promise<{ id: string }> {
-  await requireAdmin();
+  const staff = await requireStaff();
+  const current = await repo.getWithKey(id);
+  assertCanEdit(staff, current);
+  const curator = canCurateMaster(staff);
 
   const { storedContent, answerKey, principleCodes } = await validate(input);
 
@@ -190,7 +300,12 @@ export async function updateQuestion(
     prompt: input.prompt,
     content: storedContent,
     answerKey,
-    status: input.status,
+    status: curator ? input.status : "draft",
+    // The resubmit path, implicit on purpose: a submitter saving a DENIED
+    // question sends it back to the pile — revision beside the note, no
+    // separate "resubmit" button to forget. Curator saves never touch the
+    // review dimension here; verdicts go through approve/deny below.
+    ...(curator ? {} : { reviewStatus: "proposed" as const }),
   });
 
   // Not transactional — see the note above.
@@ -201,9 +316,11 @@ export async function updateQuestion(
   return { id };
 }
 
-/** The normal path for anything that has been seen by a reviewer. */
+/** The normal path for anything that has been seen by a reviewer.
+ * Lifecycle is curation — project leads and admins (PODS.md: leads and
+ * above own the master set; requireAdmin here predated the role tiers). */
 export async function archiveQuestion(id: string): Promise<void> {
-  await requireAdmin();
+  await requireProjectLead();
   await repo.setStatus(id, "archived");
 }
 
@@ -211,7 +328,7 @@ export async function setQuestionStatus(
   id: string,
   status: QuestionStatus,
 ): Promise<void> {
-  await requireAdmin();
+  await requireProjectLead();
   await repo.setStatus(id, status);
 }
 
@@ -219,10 +336,78 @@ export async function setQuestionStatus(
  * Only succeeds on an unanswered question: `responses.question_id` is
  * ON DELETE RESTRICT, so Postgres refuses the rest and the repo turns that
  * 23503 into "This question has been answered — archive it instead."
+ *
+ * Admin (system tier), with one exception: a submitter withdrawing their
+ * OWN still-unapproved proposal. That's taking back a suggestion, not
+ * deleting master content.
  */
 export async function deleteQuestion(id: string): Promise<void> {
-  await requireAdmin();
+  const staff = await requireStaff();
+  if (staff.role !== "admin") {
+    const current = await repo.getWithKey(id);
+    const withdrawingOwn =
+      current.authorId === staff.userId &&
+      current.reviewStatus !== "approved";
+    if (!withdrawingOwn) {
+      throw new AppError(
+        "forbidden",
+        "This action requires an admin account.",
+      );
+    }
+  }
   await repo.remove(id);
+}
+
+/* ------------------------------------------------------------------ *
+ * The roundtable's verdicts (Wave 2)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Approve = vetted AND playable: review flips to 'approved', lifecycle to
+ * 'live' in the same breath. The roundtable just agreed it's ready — an
+ * approved-but-draft question that nobody remembers to publish is the
+ * failure mode this avoids. Curators can still demote to draft after.
+ */
+export async function approveQuestion(id: string): Promise<void> {
+  const staff = await requireProjectLead();
+  await assertAwaitingReview(id);
+  await repo.setReviewDecision(id, {
+    reviewStatus: "approved",
+    reviewNote: null,
+    reviewedBy: staff.userId,
+  });
+  await repo.setStatus(id, "live");
+}
+
+/** The note is required: there are no notifications, so the note IS the
+ * feedback channel — a bare "denied" teaches the submitter nothing. */
+export async function denyQuestion(id: string, note: string): Promise<void> {
+  const staff = await requireProjectLead();
+  const trimmed = note.trim();
+  if (!trimmed) {
+    throw new AppError(
+      "validation",
+      "Say why — the note is the only feedback the submitter gets.",
+    );
+  }
+  await assertAwaitingReview(id);
+  await repo.setReviewDecision(id, {
+    reviewStatus: "denied",
+    reviewNote: trimmed,
+    reviewedBy: staff.userId,
+  });
+}
+
+/** Verdicts land on the pile only — approving an already-approved (or
+ * re-denying a denied) question is a stale screen, not a state change. */
+async function assertAwaitingReview(id: string): Promise<void> {
+  const current = await repo.getWithKey(id);
+  if (current.reviewStatus !== "proposed") {
+    throw new AppError(
+      "conflict",
+      "This question already has a verdict — refresh to see it.",
+    );
+  }
 }
 
 /* ------------------------------------------------------------------ *

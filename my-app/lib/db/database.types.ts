@@ -345,6 +345,10 @@ export type Database = {
           created_at: string
           id: string
           prompt: string
+          review_note: string | null
+          review_status: Database["public"]["Enums"]["review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: Database["public"]["Enums"]["question_status"]
           template: Database["public"]["Enums"]["template_type"]
           updated_at: string
@@ -356,6 +360,10 @@ export type Database = {
           created_at?: string
           id?: string
           prompt: string
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: Database["public"]["Enums"]["question_status"]
           template: Database["public"]["Enums"]["template_type"]
           updated_at?: string
@@ -367,11 +375,23 @@ export type Database = {
           created_at?: string
           id?: string
           prompt?: string
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: Database["public"]["Enums"]["question_status"]
           template?: Database["public"]["Enums"]["template_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "questions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       responses: {
         Row: {
@@ -533,6 +553,7 @@ export type Database = {
     Enums: {
       batch_status: "draft" | "active" | "inactive"
       question_status: "draft" | "live" | "archived"
+      review_status: "proposed" | "approved" | "denied"
       session_phase: "lobby" | "voting" | "locked" | "revealed" | "ended"
       staff_role: "admin" | "pod_lead" | "project_lead"
       template_type: "which_principle" | "rank_variants" | "write_feedback"
@@ -668,6 +689,7 @@ export const Constants = {
     Enums: {
       batch_status: ["draft", "active", "inactive"],
       question_status: ["draft", "live", "archived"],
+      review_status: ["proposed", "approved", "denied"],
       session_phase: ["lobby", "voting", "locked", "revealed", "ended"],
       staff_role: ["admin", "pod_lead", "project_lead"],
       template_type: ["which_principle", "rank_variants", "write_feedback"],

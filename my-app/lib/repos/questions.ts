@@ -43,6 +43,12 @@ export type AnswerKeyOf<T extends TemplateKey> =
 
 export type QuestionStatus = Database["public"]["Enums"]["question_status"];
 
+/** The review dimension (Wave 2), orthogonal to `status`: `status` answers
+ * "can this be answered right now?", `review_status` answers "has the
+ * roundtable vetted this?". Participant-facing reads are pinned to
+ * 'approved' at the query — see getForReviewer/listForReviewer. */
+export type ReviewStatus = Database["public"]["Enums"]["review_status"];
+
 /* ------------------------------------------------------------------ *
  * Row shapes
  *
@@ -71,6 +77,8 @@ export type StoredQuestionWithKey = {
     content: StoredContent<T>;
     answerKey: AnswerKeyOf<T>;
     authorId: string | null;
+    reviewStatus: ReviewStatus;
+    reviewNote: string | null;
   };
 }[TemplateKey];
 
@@ -79,6 +87,9 @@ export type QuestionSummaryRow = QuestionBase & {
   template: TemplateKey;
   /** Parsed so the service can derive an excerpt from the first turn. */
   content: StoredContent<TemplateKey>;
+  reviewStatus: ReviewStatus;
+  reviewNote: string | null;
+  authorId: string | null;
   topicIds: string[];
   topicSlugs: string[];
   principleIds: string[];
@@ -95,10 +106,13 @@ export type QuestionSummaryRow = QuestionBase & {
 const REVIEWER_COLUMNS =
   "id, template, prompt, content, status, created_at, updated_at";
 
-/** Staff + post-submit reveal only. */
-const AUTHORED_COLUMNS = `${REVIEWER_COLUMNS}, answer_key, author_id`;
+/** Staff + post-submit reveal only. Review fields ride here, NOT on
+ * REVIEWER_COLUMNS — the roundtable's note is internal discussion and has
+ * no business on a participant's phone. */
+const AUTHORED_COLUMNS = `${REVIEWER_COLUMNS}, answer_key, author_id, review_status, review_note`;
 
 const SUMMARY_COLUMNS = `${REVIEWER_COLUMNS},
+  review_status, review_note, author_id,
   question_topics(topic_id, topics(slug)),
   question_principles(principle_id, principles(code)),
   responses(count)`;
@@ -107,13 +121,16 @@ const SUMMARY_COLUMNS = `${REVIEWER_COLUMNS},
  * Reads
  * ------------------------------------------------------------------ */
 
-/** Single-item read — throws not_found, and throws on an unparseable row. */
+/** Single-item read — throws not_found, and throws on an unparseable row.
+ * Pinned to approved: this is a participant-facing read, and an unvetted
+ * question must be indistinguishable from a nonexistent one. */
 export async function getForReviewer(id: string): Promise<StoredQuestion> {
   const row = unwrap(
     await serviceClient()
       .from("questions")
       .select(REVIEWER_COLUMNS)
       .eq("id", id)
+      .eq("review_status", "approved")
       .single(),
     { notFound: "That question isn't available." },
   );
@@ -135,7 +152,10 @@ export async function getWithKey(id: string): Promise<StoredQuestionWithKey> {
   return mapStoredWithKey(row);
 }
 
-/** List read — soft-fails. Order follows `ids` so a draw keeps its order. */
+/** List read — soft-fails. Order follows `ids` so a draw keeps its order.
+ * Pinned to approved, same as getForReviewer — the belt under the batch
+ * composer's suspenders: even if an unvetted id somehow lands in a batch,
+ * no participant draw will surface it. */
 export async function listForReviewer(
   ids: string[],
 ): Promise<ListResult<StoredQuestion>> {
@@ -145,7 +165,8 @@ export async function listForReviewer(
     await serviceClient()
       .from("questions")
       .select(REVIEWER_COLUMNS)
-      .in("id", ids),
+      .in("id", ids)
+      .eq("review_status", "approved"),
   );
 
   const result = collect(rows, (r) => r.id, mapStored);
@@ -175,6 +196,8 @@ export async function listWithKey(
  */
 export async function listSummaries(options?: {
   statuses?: QuestionStatus[];
+  reviewStatuses?: ReviewStatus[];
+  authorId?: string;
 }): Promise<ListResult<QuestionSummaryRow>> {
   let query = serviceClient()
     .from("questions")
@@ -182,6 +205,9 @@ export async function listSummaries(options?: {
     .order("updated_at", { ascending: false });
 
   if (options?.statuses?.length) query = query.in("status", options.statuses);
+  if (options?.reviewStatuses?.length)
+    query = query.in("review_status", options.reviewStatuses);
+  if (options?.authorId) query = query.eq("author_id", options.authorId);
 
   const rows = unwrap(await query);
 
@@ -195,6 +221,9 @@ export async function listSummaries(options?: {
         ...base(row),
         template: row.template,
         content: parseContent(row.id, row.template, row.content),
+        reviewStatus: row.review_status,
+        reviewNote: row.review_note,
+        authorId: row.author_id,
         topicIds: topics.map((t) => t.topic_id),
         topicSlugs: topics.flatMap((t) => (t.topics ? [t.topics.slug] : [])),
         principleIds: principles.map((p) => p.principle_id),
@@ -246,6 +275,9 @@ export type QuestionInsert = {
   content: unknown;
   answerKey: unknown;
   status?: QuestionStatus;
+  /** Omitted → the DB default 'approved' (curators' work skips the
+   * roundtable). The service sets 'proposed' for non-curators. */
+  reviewStatus?: ReviewStatus;
   authorId?: string | null;
 };
 
@@ -260,6 +292,7 @@ export async function insert(input: QuestionInsert): Promise<{ id: string }> {
         answer_key:
           input.answerKey as Database["public"]["Tables"]["questions"]["Insert"]["answer_key"],
         status: input.status ?? "draft",
+        ...(input.reviewStatus ? { review_status: input.reviewStatus } : {}),
         author_id: input.authorId ?? null,
       })
       .select("id")
@@ -283,6 +316,9 @@ export async function update(id: string, patch: QuestionUpdate): Promise<void> {
     payload.answer_key =
       patch.answerKey as Database["public"]["Tables"]["questions"]["Update"]["answer_key"];
   if (patch.status !== undefined) payload.status = patch.status;
+  // The resubmit path: a denied question saved by its author flips back
+  // to 'proposed'. The service decides when; this just carries it.
+  if (patch.reviewStatus !== undefined) payload.review_status = patch.reviewStatus;
 
   unwrap(
     await serviceClient()
@@ -303,6 +339,31 @@ export async function setStatus(
     await serviceClient()
       .from("questions")
       .update({ status })
+      .eq("id", id)
+      .select("id")
+      .single(),
+    { notFound: "That question no longer exists." },
+  );
+}
+
+/** The roundtable's verdict, in one write: status, note, who, when. */
+export async function setReviewDecision(
+  id: string,
+  decision: {
+    reviewStatus: ReviewStatus;
+    reviewNote: string | null;
+    reviewedBy: string;
+  },
+): Promise<void> {
+  unwrap(
+    await serviceClient()
+      .from("questions")
+      .update({
+        review_status: decision.reviewStatus,
+        review_note: decision.reviewNote,
+        reviewed_by: decision.reviewedBy,
+        reviewed_at: new Date().toISOString(),
+      })
       .eq("id", id)
       .select("id")
       .single(),
@@ -442,6 +503,8 @@ function mapStoredWithKey(
     content: unknown;
     answer_key: unknown;
     author_id: string | null;
+    review_status: ReviewStatus;
+    review_note: string | null;
   },
 ): StoredQuestionWithKey {
   return {
@@ -450,6 +513,8 @@ function mapStoredWithKey(
     content: parseContent(row.id, row.template, row.content),
     answerKey: parseAnswerKey(row.id, row.template, row.answer_key),
     authorId: row.author_id,
+    reviewStatus: row.review_status,
+    reviewNote: row.review_note,
   } as StoredQuestionWithKey;
 }
 
