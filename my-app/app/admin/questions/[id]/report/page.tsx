@@ -1,7 +1,10 @@
 import { PageHeader, StatusPill } from "@/components/admin/ui";
 import { SkippedRowsBanner } from "@/components/feedback";
+import { getWithKey } from "@/lib/services/questions";
 import { getQuestionReport } from "@/lib/services/reports";
 import { registry } from "@/lib/templates/registry";
+
+import { QuestionPreview } from "./preview";
 
 import { RateDonutRow, SharePie } from "../../../reports/charts";
 import {
@@ -26,7 +29,16 @@ export default async function QuestionReportPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const report = await getQuestionReport(id);
+  // `getWithKey` rather than `getForReviewer` for the preview: the
+  // reviewer read is pinned to approved, and this report must also serve
+  // a still-proposed question. The answer key DOES cross to the client
+  // here — the preview's reveal needs it — which is fine on this
+  // staff-gated page and would not be on any participant surface (see
+  // the note in preview.tsx).
+  const [report, question] = await Promise.all([
+    getQuestionReport(id),
+    getWithKey(id),
+  ]);
   const q = report.question;
 
   return (
@@ -178,6 +190,22 @@ export default async function QuestionReportPage({
             </ul>
           </section>
         )}
+
+        {/* Below the metrics, full flow: answer → Submit → the real
+            Reveal, all in browser memory — nothing writes. Capped at a
+            comfortable desktop width; the shell lays itself out from
+            its container, so this renders the desktop participant view. */}
+        <section className="flex max-w-[880px] flex-col gap-2.5">
+          <h2 className="text-[12px] tracking-[0.04em] text-faint">
+            AS PARTICIPANTS SEE IT
+          </h2>
+          <QuestionPreview
+            template={question.template}
+            content={question.content}
+            answerKey={question.answerKey}
+            prompt={question.prompt}
+          />
+        </section>
       </div>
     </>
   );
