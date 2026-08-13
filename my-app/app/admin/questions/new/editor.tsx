@@ -167,6 +167,7 @@ export function QuestionEditor({
   topics,
   principles,
   initial,
+  canCurate,
 }: {
   mode: "new" | "edit";
   /** Required when mode === "edit". */
@@ -174,6 +175,12 @@ export function QuestionEditor({
   topics: Topic[];
   principles: PrincipleOption[];
   initial?: EditableQuestion;
+  /** `canCurateMaster(staff)`, computed server-side by the page — the only
+   *  role fact this form needs. A curator's save lands wherever they point
+   *  it; anyone else's is forced to draft/proposed by the service regardless
+   *  of what this form shows, so the UI here is discoverability, not
+   *  security (Wave 2, PODS.md). */
+  canCurate: boolean;
 }) {
   const router = useRouter();
 
@@ -227,6 +234,16 @@ export function QuestionEditor({
   const saveError = state && !state.ok ? state.message : null;
   const saved = mode === "edit" && state?.ok === true;
 
+  // Non-curators never choose a destination status — the service forces
+  // draft/proposed regardless of what this form sends (Wave 2). The button
+  // copy says what saving actually does instead of offering a dead choice.
+  const nonCuratorSaveLabel =
+    mode === "new"
+      ? "Submit for review"
+      : initial?.reviewStatus === "denied"
+        ? "Resubmit for review"
+        : "Save (stays in review)";
+
   const [archivePending, startArchive] = useTransition();
   const [archiveError, setArchiveError] = useState<ErrorLike | null>(null);
 
@@ -270,7 +287,12 @@ export function QuestionEditor({
             membership is batch_questions, and it's composed on the Batches
             screen against the whole library. */}
         <div className="flex items-center gap-2.5">
-          {mode === "edit" && id && initial?.status !== "archived" && (
+          {!canCurate && mode === "edit" && initial && (
+            <span className="text-[12.5px] font-medium text-muted-3">
+              {initial.reviewStatus === "denied" ? "Denied" : "Pending review"}
+            </span>
+          )}
+          {canCurate && mode === "edit" && id && initial?.status !== "archived" && (
             <SubmitButton
               type="button"
               variant="ghost"
@@ -280,26 +302,62 @@ export function QuestionEditor({
               Archive
             </SubmitButton>
           )}
-          {mode === "edit" && id && (
+          {canCurate && mode === "edit" && id && (
             <ConfirmDelete
               title="Delete this question?"
               description="Permanent, and only succeeds if nobody has answered it yet. An answered question is refused — archive it instead."
               onConfirm={handleDelete}
             />
           )}
-          <SubmitButton
-            type="button"
-            variant="ghost"
-            pending={pending}
-            onClick={() => save("draft")}
-          >
-            Save draft
-          </SubmitButton>
-          <SubmitButton type="button" pending={pending} onClick={() => save("live")}>
-            {mode === "edit" ? "Save & publish" : "Publish"}
-          </SubmitButton>
+          {!canCurate && mode === "edit" && id && (
+            <ConfirmDelete
+              triggerLabel="Withdraw proposal"
+              title="Withdraw this proposal?"
+              description="Permanent — once withdrawn, you'd need to submit it again from scratch."
+              onConfirm={handleDelete}
+            />
+          )}
+          {canCurate ? (
+            <>
+              <SubmitButton
+                type="button"
+                variant="ghost"
+                pending={pending}
+                onClick={() => save("draft")}
+              >
+                Save draft
+              </SubmitButton>
+              <SubmitButton type="button" pending={pending} onClick={() => save("live")}>
+                {mode === "edit" ? "Save & publish" : "Publish"}
+              </SubmitButton>
+            </>
+          ) : (
+            <SubmitButton type="button" pending={pending} onClick={() => save("draft")}>
+              {nonCuratorSaveLabel}
+            </SubmitButton>
+          )}
         </div>
       </header>
+
+      {!canCurate && mode === "edit" && initial?.reviewStatus === "denied" && (
+        <div className="mx-6 mt-4 flex flex-col gap-1.5 rounded-[10px] border border-violet-line-2 bg-violet-tint-2 px-4 py-3.5">
+          <p className="text-[12.5px] font-semibold text-violet-ink">
+            Denied by the roundtable:
+          </p>
+          <p className="text-[13px] leading-[1.55] text-violet-ink">
+            {initial.reviewNote}
+          </p>
+          <p className="text-[12px] text-muted-3">
+            Saving will resubmit this question for review.
+          </p>
+        </div>
+      )}
+
+      {canCurate && mode === "edit" && initial?.reviewStatus === "proposed" && (
+        <p className="px-6 pt-4 text-[12px] text-muted-3">
+          Proposed — awaiting review.
+        </p>
+      )}
 
       {(saveError || archiveError || saved) && (
         <div className="flex flex-col gap-2 px-6 pt-4">

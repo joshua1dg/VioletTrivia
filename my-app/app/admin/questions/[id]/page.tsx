@@ -1,3 +1,6 @@
+import { PageHeader } from "@/components/admin/ui";
+import { canCurateMaster, requireStaff } from "@/lib/auth";
+import { asAppError, isAppError } from "@/lib/errors";
 import { getForEditor } from "@/lib/services/questions";
 import { listActivePrinciples } from "@/lib/services/principles";
 import { listTopics } from "@/lib/services/topics";
@@ -12,6 +15,12 @@ import { QuestionEditor } from "../new/editor";
  * shape throws rather than soft-failing, and that throw is left to propagate
  * to `app/error.tsx` on purpose (PLAN §5.7 — "silently rendering half a
  * question is worse than an error").
+ *
+ * Wave 2: `getForEditor` also throws `AppError("forbidden")` for a
+ * non-curator opening someone else's question, or their own once it's
+ * approved. Caught here rather than left to propagate — same pattern as
+ * `app/admin/staff/page.tsx` — so a stale link renders a plain access note
+ * (200) instead of the generic error boundary.
  */
 export default async function EditQuestionPage({
   params,
@@ -19,9 +28,26 @@ export default async function EditQuestionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const staff = await requireStaff();
 
-  const [question, topics, principles] = await Promise.all([
-    getForEditor(id),
+  let question;
+  try {
+    question = await getForEditor(id);
+  } catch (error) {
+    if (isAppError(error) && error.kind === "forbidden") {
+      return (
+        <>
+          <PageHeader title="Edit question" />
+          <p className="max-w-[60ch] p-6 text-[13.5px] leading-[1.6] text-muted-2">
+            {asAppError(error).userMessage}
+          </p>
+        </>
+      );
+    }
+    throw error;
+  }
+
+  const [topics, principles] = await Promise.all([
     listTopics(),
     listActivePrinciples(),
   ]);
@@ -30,6 +56,7 @@ export default async function EditQuestionPage({
     <QuestionEditor
       mode="edit"
       id={id}
+      canCurate={canCurateMaster(staff)}
       topics={topics}
       principles={principles.map((p) => ({
         code: p.code,
