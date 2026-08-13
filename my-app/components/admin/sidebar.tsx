@@ -17,7 +17,7 @@ import { signOut } from "@/app/login/actions";
 
 const NAV = [
   { href: "/admin/questions", label: "Questions" },
-  // Everyone: your submissions and their verdicts; project leads and
+  // Everyone: your submissions and their verdicts; DOLs and
   // admins additionally see the pending pile here (Wave 2).
   { href: "/admin/proposals", label: "Proposals" },
   { href: "/admin/topics", label: "Topics" },
@@ -82,12 +82,18 @@ export function Sidebar({
             </span>
             {/* The one part of the sidebar allowed to scroll: a long topic
                 list must never push sign-out off the bottom of the screen. */}
-            <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto text-[12.5px] text-muted">
+            <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto text-[12.5px] text-muted">
+              {/* Each row is a door into that topic's own page (2026-08-13),
+                  not a caption for the Topics section above. */}
               {topics.map((t) => (
-                <div key={t.slug} className="flex justify-between gap-2">
+                <Link
+                  key={t.slug}
+                  href={`/admin/topics/${t.slug}`}
+                  className="-mx-1 flex justify-between gap-2 rounded-md px-1 py-1 transition-colors hover:bg-line-3 hover:text-ink-4"
+                >
                   <span className="truncate">{t.label}</span>
                   <span className="text-faint">{t.questionCount}</span>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
