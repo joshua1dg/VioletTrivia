@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { authClient, serviceClient } from "@/lib/db/server";
 import { AppError } from "@/lib/errors";
 
@@ -75,8 +77,17 @@ export function podScopeId(staff: Staff): string | null {
  * contained query inside lib/auth is the orchestrator-approved exception
  * (PLAN §9 B2). It stays this narrow: one table, one column list, no
  * business logic.
+ *
+ * Wrapped in React's `cache()` — the per-REQUEST memoizer, and the exact
+ * shape this Next version's own auth guide recommends for a session
+ * verifier. Every requireStaff()/requireAdmin() in a request still runs
+ * and still enforces; only the underlying getUser() round-trip and staff
+ * query happen once instead of once per guard. The memo dies with the
+ * request, so one user's identity can never bleed into another's request
+ * — which is also why the CROSS-request caches (`use cache`,
+ * unstable_cache) must never wrap this function.
  */
-async function resolveStaff(): Promise<Staff> {
+const resolveStaff = cache(async (): Promise<Staff> => {
   const supabase = await authClient();
   const { data, error } = await supabase.auth.getUser();
 
@@ -103,7 +114,7 @@ async function resolveStaff(): Promise<Staff> {
     email: staffRow.email ?? data.user.email ?? "",
     role: staffRow.role,
   };
-}
+});
 
 /** `{ userId, email, role } | null` — null covers both "not signed in" and
  * "signed in but no staff row." Use requireStaff()/requireAdmin() when the
