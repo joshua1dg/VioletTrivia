@@ -13,8 +13,9 @@ const initialState: SignInResult | null = null;
  * here is hand-rolled state.
  *
  * TEMPORARY (2026-08-13): both fields are pre-filled with the shared
- * demo login (demo@violet.demo / password) so demo viewers can sign in
- * without typing. Strip the defaultValues when the demo window closes.
+ * demo login (demo@demo.com / demo, created by migration
+ * 20260814100000_demo_login.sql) so demo viewers can sign in without
+ * typing. Strip the defaultValues when the demo window closes.
  */
 export function LoginForm() {
   const [state, action, pending] = useActionState(signIn, initialState);
@@ -32,7 +33,7 @@ export function LoginForm() {
           required
           autoComplete="email"
           autoFocus
-          defaultValue="demo@violet.demo"
+          defaultValue="demo@demo.com"
           className="rounded-[7px] border border-line px-3 py-2 text-[14px] text-ink outline-none focus:border-violet"
         />
       </label>
@@ -44,7 +45,7 @@ export function LoginForm() {
           name="password"
           required
           autoComplete="current-password"
-          defaultValue="password"
+          defaultValue="demo"
           className="rounded-[7px] border border-line px-3 py-2 text-[14px] text-ink outline-none focus:border-violet"
         />
       </label>
